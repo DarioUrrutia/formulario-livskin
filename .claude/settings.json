@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -c ':*)",
+      "Bash(py \"C:/Users/JeanUrrutia/ProyectosClaude/setup_acceso.py\")"
+    ]
+  }
+}

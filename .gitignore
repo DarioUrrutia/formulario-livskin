@@ -1,0 +1,6 @@
+Datos_Livskin.xlsx
+formulario_livskin.py
+formulario_livskin.pyw
+__pycache__/
+*.pyc
+.env
