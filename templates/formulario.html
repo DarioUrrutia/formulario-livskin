@@ -28,10 +28,35 @@
             padding: 20px;
             border-bottom: 3px solid #C0392B;
         }
-        .header img {
-            max-width: 200px;
-            height: auto;
+        .header img { max-width: 200px; height: auto; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #eee;
+            background: #fafafa;
         }
+        .tab-btn {
+            flex: 1;
+            padding: 12px 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            border: none;
+            background: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tab-btn.active { color: #C0392B; border-bottom-color: #C0392B; }
+        .tab-btn:hover:not(.active) { color: #666; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form */
         .form-body { padding: 24px; }
         .seccion {
             font-size: 11px;
@@ -43,6 +68,7 @@
             border-bottom: 1px solid #f0f0f0;
             padding-bottom: 4px;
         }
+        .seccion:first-child { margin-top: 0; }
         .field { margin-bottom: 14px; }
         label {
             display: block;
@@ -52,7 +78,7 @@
             margin-bottom: 5px;
             text-transform: uppercase;
         }
-        input, select {
+        input, select, textarea {
             width: 100%;
             padding: 10px 12px;
             border: 1.5px solid #ddd;
@@ -60,17 +86,15 @@
             font-size: 14px;
             transition: border 0.2s;
             background: white;
+            font-family: Arial, sans-serif;
         }
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #C0392B;
         }
-        .fila-dos {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        button {
+        input:disabled { background: #f5f5f5; color: #aaa; }
+        .fila-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        button[type="submit"] {
             width: 100%;
             padding: 14px;
             background: #C0392B;
@@ -83,9 +107,11 @@
             margin-top: 20px;
             letter-spacing: 1px;
         }
-        button:hover { background: #a93226; }
+        button[type="submit"]:hover { background: #a93226; }
+
+        /* Flash */
         .mensaje {
-            margin: 12px 24px 0;
+            margin: 10px 24px;
             padding: 12px;
             border-radius: 8px;
             text-align: center;
@@ -94,127 +120,824 @@
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        .error {
+        .mensaje.error {
             background: #f8d7da;
             color: #721c24;
             border-color: #f5c6cb;
         }
+
+        /* Badge promo */
+        .badge-info {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+
+        /* Cliente tab */
+        .search-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .search-row input { flex: 1; }
+        .btn-buscar {
+            padding: 10px 16px;
+            background: #C0392B;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .btn-buscar:hover { background: #a93226; }
+        .saldo-card {
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .saldo-card.deuda { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .saldo-card.ok    { background: #d4edda; border: 1px solid #c3e6cb; }
+        .saldo-numero { font-size: 22px; font-weight: bold; margin: 4px 0; }
+        .saldo-label  { font-size: 12px; color: #666; text-transform: uppercase; }
+        .tabla-cliente {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .tabla-cliente th {
+            background: #f5f5f5;
+            padding: 8px;
+            text-align: left;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            border-bottom: 1px solid #eee;
+        }
+        .tabla-cliente td {
+            padding: 8px;
+            border-bottom: 1px solid #f5f5f5;
+            vertical-align: top;
+        }
+        .tabla-cliente tr:last-child td { border-bottom: none; }
+        .subtitulo-tabla {
+            font-size: 12px;
+            font-weight: bold;
+            color: #C0392B;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 16px 0 8px;
+        }
+        .sin-datos { color: #aaa; font-size: 13px; text-align: center; padding: 20px 0; }
+        #resultado-cliente { display: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <div class="header">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Livskin Logo">
-        </div>
+<div class="card">
+    <div class="header">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Livskin Logo">
+    </div>
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="mensaje {% if 'obligatorio' in message %}error{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="mensaje {% if 'Error' in message %}error{% endif %}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-        <form class="form-body" method="POST">
+    <div class="tabs">
+        <button class="tab-btn" data-tab="venta"     onclick="cambiarTab('venta')">Venta</button>
+        <button class="tab-btn" data-tab="gasto"     onclick="cambiarTab('gasto')">Gasto</button>
+        <button class="tab-btn" data-tab="cobro"     onclick="cambiarTab('cobro')">Cobro</button>
+        <button class="tab-btn" data-tab="cliente"   onclick="cambiarTab('cliente')">Cliente</button>
+        <button class="tab-btn" data-tab="dashboard" onclick="cambiarTab('dashboard')">Dashboard</button>
+    </div>
 
-            <div class="seccion">Informacion General</div>
+    <!-- ═══════════════════════════════════════════════════════ TAB: VENTA -->
+    <div id="tab-venta" class="tab-content form-body">
+        <form method="POST" action="/venta">
 
-            <div class="fila-dos">
-                <div class="field">
-                    <label>Fecha</label>
-                    <input type="date" name="fecha">
-                </div>
-                <div class="field">
-                    <label>Telefono</label>
-                    <input type="tel" name="telefono" placeholder="Numero">
-                </div>
-            </div>
-
-            <div class="fila-dos">
-                <div class="field">
-                    <label>Area</label>
-                    <input type="text" name="area" placeholder="Area">
-                </div>
-                <div class="field">
-                    <label>Tipo</label>
-                    <input type="text" name="tipo" placeholder="Tipo">
-                </div>
-            </div>
-
+            <div class="seccion">Cliente</div>
             <div class="field">
-                <label>Categoria</label>
-                <input type="text" name="categoria" placeholder="Categoria">
+                <label>Nombre *</label>
+                <input type="text" name="cliente" placeholder="Nombre del paciente" required
+                       list="lista-clientes">
+                <datalist id="lista-clientes">
+                    {% for c in clientes %}<option value="{{ c }}">{% endfor %}
+                </datalist>
+            </div>
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Fecha *</label>
+                    <input type="date" name="fecha" id="fecha-venta" required>
+                </div>
+                <div class="field">
+                    <label>Teléfono</label>
+                    <input type="tel" name="telefono" placeholder="Número">
+                </div>
             </div>
 
+            <div class="seccion">Servicio</div>
             <div class="field">
-                <label>Zona / Cantidad / Envase</label>
-                <input type="text" name="zona_cantidad_envase" placeholder="Zona / Cantidad / Envase">
+                <label>Tipo *</label>
+                <select name="tipo" id="tipo-venta" onchange="actualizarVenta()" required>
+                    <option value="">— Seleccionar —</option>
+                    <option value="Tratamiento">Tratamiento</option>
+                    <option value="Producto">Producto</option>
+                    <option value="Promoción">Promoción (sin cobro)</option>
+                    <option value="Otros">Otros</option>
+                </select>
             </div>
 
-            <div class="fila-dos">
+            <div id="venta-detalle">
                 <div class="field">
-                    <label>Proxima Cita</label>
-                    <input type="date" name="proxima_cita">
-                </div>
-                <div class="field">
-                    <label>Cumpleanos</label>
-                    <input type="date" name="cumpleanos">
-                </div>
-            </div>
-
-            <div class="seccion">Pago</div>
-
-            <div class="fila-dos">
-                <div class="field">
-                    <label>Moneda</label>
-                    <select name="moneda">
-                        <option value="PEN">PEN - Soles</option>
-                        <option value="USD">USD - Dolares</option>
+                    <label>Categoría</label>
+                    <select name="categoria" id="categoria-venta" onchange="mostrarOtroVenta(this)">
+                        <option value="">— Seleccionar —</option>
+                        <optgroup label="Tratamientos">
+                            <option>Botox</option>
+                            <option>Ácido Hialurónico</option>
+                            <option>PRP</option>
+                            <option>Hilos</option>
+                            <option>Limpieza Facial</option>
+                            <option>Exosoma / Vtech</option>
+                            <option>Esperma de Salmón</option>
+                            <option>Vitamina C / Cóctel de vida</option>
+                            <option>Ozono</option>
+                            <option>Autohemoterapia</option>
+                            <option>Infiltración</option>
+                            <option>Bioestimuladores</option>
+                            <option>Rinomodelación con Ac. Hialurónico</option>
+                            <option>Bléfaroplastia</option>
+                            <option>Cauterización</option>
+                            <option>Lifting Facial</option>
+                            <option>Microblending</option>
+                            <option>Pigmentación de Labios</option>
+                            <option>Retiro de Lipoma</option>
+                            <option>Subcisión con PRP</option>
+                            <option>Certificado Médico</option>
+                        </optgroup>
+                        <optgroup label="Productos">
+                            <option>Bloqueador</option>
+                            <option>Hidratante Forte</option>
+                            <option>Jabón</option>
+                            <option>Shampoo</option>
+                            <option>Loción</option>
+                            <option>Exfoliante</option>
+                            <option>Mascarilla</option>
+                            <option>Vitamina C Sérum</option>
+                        </optgroup>
+                        <option value="__otro__">Otro (escribir)</option>
                     </select>
                 </div>
+                <div class="field" id="campo-otro-venta" style="display:none;">
+                    <label>Especificar</label>
+                    <input type="text" name="categoria_otro" id="categoria-otro-venta" placeholder="Escribir categoría">
+                </div>
                 <div class="field">
-                    <label>Total</label>
-                    <input type="number" name="total" placeholder="0.00" step="0.01">
+                    <label>Zona / Cantidad / Envase</label>
+                    <input type="text" name="zona_cantidad_envase" placeholder="Ej: 3 Superior, 2 und...">
+                </div>
+                <div class="fila-dos">
+                    <div class="field">
+                        <label>Próxima Cita</label>
+                        <input type="date" name="proxima_cita">
+                    </div>
+                    <div class="field">
+                        <label>Cumpleaños</label>
+                        <input type="date" name="cumpleanos">
+                    </div>
                 </div>
             </div>
 
+            <div id="venta-pago">
+                <div class="seccion">Pago</div>
+                <div id="aviso-promo" class="badge-info" style="display:none;">
+                    Promoción — se registra sin cobro
+                </div>
+                <div id="venta-pago-campos">
+                    <div class="fila-dos">
+                        <div class="field">
+                            <label>Moneda</label>
+                            <select name="moneda">
+                                <option value="SOLES" selected>Soles</option>
+                                <option value="DOLARES">Dólares</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Total</label>
+                            <input type="number" name="total" id="total-venta" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div class="fila-dos">
+                        <div class="field">
+                            <label>Efectivo</label>
+                            <input type="number" name="efectivo" placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Yape</label>
+                            <input type="number" name="yape" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div class="fila-dos">
+                        <div class="field">
+                            <label>Plin</label>
+                            <input type="number" name="plin" placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Giro</label>
+                            <input type="number" name="giro" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Debe (queda pendiente)</label>
+                        <input type="number" name="debe" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit">GUARDAR VENTA</button>
+        </form>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ TAB: GASTO -->
+    <div id="tab-gasto" class="tab-content form-body">
+        <form method="POST" action="/gasto">
+
+            <div class="seccion">Gasto</div>
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Fecha *</label>
+                    <input type="date" name="fecha_gasto" id="fecha-gasto" required>
+                </div>
+                <div class="field">
+                    <label>Tipo *</label>
+                    <select name="tipo_gasto" required>
+                        <option value="">— Seleccionar —</option>
+                        <option value="RR.HH">RR.HH (empleado)</option>
+                        <option value="Proveedor">Proveedor</option>
+                        <option value="Servicios">Servicios (alquiler, luz, etc.)</option>
+                        <option value="Insumos">Insumos / Materiales</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Destinatario</label>
+                <input type="text" name="destinatario" placeholder="Nombre del empleado o proveedor">
+            </div>
+            <div class="field">
+                <label>Descripción</label>
+                <input type="text" name="descripcion" placeholder="Concepto del gasto">
+            </div>
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Monto *</label>
+                    <input type="number" name="monto_gasto" placeholder="0.00" step="0.01" required>
+                </div>
+                <div class="field">
+                    <label>Método de pago</label>
+                    <select name="metodo_pago_gasto">
+                        <option value="">— Seleccionar —</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Yape">Yape</option>
+                        <option value="Plin">Plin</option>
+                        <option value="Transferencia">Transferencia</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit">GUARDAR GASTO</button>
+        </form>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ TAB: COBRO -->
+    <div id="tab-cobro" class="tab-content form-body">
+        <form method="POST" action="/cobro">
+
+            <div class="seccion">Cobro de deuda</div>
+            <p style="font-size:13px;color:#666;margin-bottom:16px;">
+                Registrá aquí cuando un paciente viene a pagar lo que quedó debiendo.
+            </p>
+            <div class="field">
+                <label>Cliente *</label>
+                <input type="text" name="cliente_cobro" placeholder="Nombre del paciente" required
+                       list="lista-clientes-cobro">
+                <datalist id="lista-clientes-cobro">
+                    {% for c in clientes %}<option value="{{ c }}">{% endfor %}
+                </datalist>
+            </div>
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Fecha *</label>
+                    <input type="date" name="fecha_cobro" id="fecha-cobro" required>
+                </div>
+                <div class="field">
+                    <label>Monto cobrado *</label>
+                    <input type="number" name="monto_cobro" placeholder="0.00" step="0.01" required>
+                </div>
+            </div>
+            <div class="seccion">Forma de pago</div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Efectivo</label>
-                    <input type="number" name="efectivo" placeholder="0.00" step="0.01">
+                    <input type="number" name="efectivo_cobro" placeholder="0.00" step="0.01">
                 </div>
                 <div class="field">
                     <label>Yape</label>
-                    <input type="number" name="yape" placeholder="0.00" step="0.01">
+                    <input type="number" name="yape_cobro" placeholder="0.00" step="0.01">
                 </div>
             </div>
-
             <div class="fila-dos">
                 <div class="field">
                     <label>Plin</label>
-                    <input type="number" name="plin" placeholder="0.00" step="0.01">
+                    <input type="number" name="plin_cobro" placeholder="0.00" step="0.01">
                 </div>
                 <div class="field">
                     <label>Giro</label>
-                    <input type="number" name="giro" placeholder="0.00" step="0.01">
+                    <input type="number" name="giro_cobro" placeholder="0.00" step="0.01">
                 </div>
             </div>
-
-            <div class="fila-dos">
-                <div class="field">
-                    <label>Debe</label>
-                    <input type="number" name="debe" placeholder="0.00" step="0.01">
-                </div>
-                <div class="field">
-                    <label>Pago Saldo</label>
-                    <input type="number" name="pago_saldo" placeholder="0.00" step="0.01">
-                </div>
+            <div class="field">
+                <label>Notas</label>
+                <input type="text" name="notas_cobro" placeholder="Ej: pago de deuda del 15/03">
             </div>
 
-            <button type="submit">GUARDAR</button>
+            <button type="submit">REGISTRAR COBRO</button>
         </form>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════ TAB: CLIENTE -->
+    <div id="tab-cliente" class="tab-content form-body">
+
+        <div class="seccion">Buscar cliente</div>
+        <div class="search-row">
+            <input type="text" id="input-buscar" placeholder="Nombre del paciente"
+                   list="lista-clientes-buscar" onkeydown="if(event.key==='Enter') buscarCliente()">
+            <datalist id="lista-clientes-buscar">
+                {% for c in clientes %}<option value="{{ c }}">{% endfor %}
+            </datalist>
+            <button class="btn-buscar" onclick="buscarCliente()">Buscar</button>
+        </div>
+
+        <div id="resultado-cliente">
+            <div id="saldo-card" class="saldo-card">
+                <div class="saldo-label">Saldo pendiente</div>
+                <div class="saldo-numero" id="saldo-valor">S/ 0.00</div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">
+                    Debe: <span id="saldo-debe">0</span> &nbsp;|&nbsp;
+                    Cobrado: <span id="saldo-cobrado">0</span>
+                </div>
+            </div>
+
+            <div class="subtitulo-tabla">Ventas</div>
+            <div id="tabla-ventas-wrap"></div>
+
+            <div class="subtitulo-tabla">Cobros recibidos</div>
+            <div id="tabla-cobros-wrap"></div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════ TAB: DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content form-body" style="padding:16px;">
+
+        <!-- Filtros de período -->
+        <div class="dash-periodos">
+            <button class="periodo-btn active" onclick="setPeriodo('mes', this)">Este mes</button>
+            <button class="periodo-btn" onclick="setPeriodo('3m', this)">3 meses</button>
+            <button class="periodo-btn" onclick="setPeriodo('6m', this)">6 meses</button>
+            <button class="periodo-btn" onclick="setPeriodo('anio', this)">Este año</button>
+            <button class="periodo-btn" onclick="setPeriodo('todo', this)">Todo</button>
+        </div>
+        <div class="dash-fechas">
+            <input type="date" id="dash-desde" onchange="cargarDashboard()">
+            <span style="color:#aaa;font-size:13px;">→</span>
+            <input type="date" id="dash-hasta" onchange="cargarDashboard()">
+        </div>
+
+        <div id="dash-loading" style="text-align:center;padding:30px;color:#aaa;display:none;">
+            Cargando datos...
+        </div>
+
+        <div id="dash-contenido" style="display:none;">
+
+            <!-- Fila 1: financieros -->
+            <div class="kpi-seccion">Financiero</div>
+            <div class="kpi-grid kpi-3">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Facturado</div>
+                    <div class="kpi-valor" id="kpi-total">—</div>
+                </div>
+                <div class="kpi-card kpi-verde">
+                    <div class="kpi-label">Total Cobrado</div>
+                    <div class="kpi-valor" id="kpi-cobrado">—</div>
+                </div>
+                <div class="kpi-card kpi-rojo">
+                    <div class="kpi-label">Por Cobrar</div>
+                    <div class="kpi-valor" id="kpi-pendiente">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Ticket Promedio</div>
+                    <div class="kpi-valor" id="kpi-ticket">—</div>
+                </div>
+                <div class="kpi-card kpi-verde">
+                    <div class="kpi-label">Tasa de Cobro</div>
+                    <div class="kpi-valor" id="kpi-tasa">—</div>
+                </div>
+                <div class="kpi-card" id="kpi-balance-card">
+                    <div class="kpi-label">Balance Neto</div>
+                    <div class="kpi-valor" id="kpi-balance">—</div>
+                    <div class="kpi-sub" id="kpi-gastos-sub">—</div>
+                </div>
+            </div>
+
+            <!-- Fila 2: operativos -->
+            <div class="kpi-seccion">Operaciones</div>
+            <div class="kpi-grid kpi-3">
+                <div class="kpi-card">
+                    <div class="kpi-label">N° Atenciones</div>
+                    <div class="kpi-valor" id="kpi-atenciones">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Clientes Únicos</div>
+                    <div class="kpi-valor" id="kpi-clientes">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Promociones Dadas</div>
+                    <div class="kpi-valor" id="kpi-promos">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Tratamientos</div>
+                    <div class="kpi-valor" id="kpi-trat">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Productos</div>
+                    <div class="kpi-valor" id="kpi-prod">—</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Gastos</div>
+                    <div class="kpi-valor kpi-rojo-txt" id="kpi-gastos">—</div>
+                </div>
+            </div>
+
+            <!-- Ventas por mes (cobrado vs pendiente) -->
+            <div class="chart-card">
+                <div class="chart-titulo">Ventas por mes — cobrado vs pendiente</div>
+                <canvas id="chart-meses" height="200"></canvas>
+            </div>
+
+            <!-- Métodos de pago + Mix tratamiento/producto -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div class="chart-card" style="margin:0">
+                    <div class="chart-titulo">Métodos de pago</div>
+                    <canvas id="chart-metodos" height="200"></canvas>
+                </div>
+                <div class="chart-card" style="margin:0">
+                    <div class="chart-titulo">Mix de ventas</div>
+                    <canvas id="chart-mix" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Top clientes -->
+            <div class="chart-card">
+                <div class="chart-titulo">Top 10 clientes por facturación</div>
+                <canvas id="chart-clientes" height="280"></canvas>
+            </div>
+
+            <!-- Top tratamientos -->
+            <div class="chart-card">
+                <div class="chart-titulo">Top 10 tratamientos / categorías</div>
+                <canvas id="chart-cats" height="280"></canvas>
+            </div>
+
+            <!-- Ventas recientes -->
+            <div class="chart-card">
+                <div class="chart-titulo">Atenciones recientes</div>
+                <div id="tabla-recientes"></div>
+            </div>
+
+        </div><!-- /dash-contenido -->
+    </div>
+
+</div><!-- /card -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .dash-periodos {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    .periodo-btn {
+        padding: 6px 12px;
+        border: 1.5px solid #ddd;
+        border-radius: 20px;
+        background: white;
+        font-size: 12px;
+        font-weight: bold;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .periodo-btn.active, .periodo-btn:hover {
+        background: #C0392B;
+        color: white;
+        border-color: #C0392B;
+    }
+    .dash-fechas {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .dash-fechas input {
+        flex: 1;
+        padding: 7px 10px;
+        border: 1.5px solid #ddd;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+    .kpi-seccion {
+        font-size: 10px; font-weight: bold; color: #999;
+        text-transform: uppercase; letter-spacing: 1px;
+        margin: 14px 0 6px;
+    }
+    .kpi-grid { display: grid; gap: 8px; margin-bottom: 4px; }
+    .kpi-3    { grid-template-columns: 1fr 1fr 1fr; }
+    .kpi-card {
+        background: #f9f9f9; border: 1px solid #eee;
+        border-radius: 10px; padding: 10px 6px; text-align: center;
+    }
+    .kpi-card.kpi-verde { background: #f0faf4; border-color: #c3e6cb; }
+    .kpi-card.kpi-rojo  { background: #fdf4f4; border-color: #f5c6cb; }
+    .kpi-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
+    .kpi-valor { font-size: 14px; font-weight: bold; color: #333; }
+    .kpi-sub   { font-size: 9px; color: #aaa; margin-top: 2px; }
+    .kpi-verde .kpi-valor { color: #27ae60; }
+    .kpi-rojo  .kpi-valor { color: #C0392B; }
+    .kpi-rojo-txt { color: #C0392B; }
+    .chart-card {
+        background: white; border: 1px solid #eee;
+        border-radius: 10px; padding: 14px; margin-bottom: 10px;
+    }
+    .chart-titulo {
+        font-size: 11px; font-weight: bold; color: #C0392B;
+        text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+    }
+    .tabla-rec { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tabla-rec th { background:#f5f5f5; padding:6px 8px; text-align:left; font-size:10px; color:#888; text-transform:uppercase; border-bottom:1px solid #eee; }
+    .tabla-rec td { padding:6px 8px; border-bottom:1px solid #f5f5f5; vertical-align:top; }
+    .tabla-rec tr:last-child td { border-bottom:none; }
+    .debe-badge { color:#C0392B; font-weight:bold; font-size:11px; }
+</style>
+<script>
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function cambiarTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+}
+
+// ── Lógica Venta ─────────────────────────────────────────────────────────────
+function actualizarVenta() {
+    const tipo = document.getElementById('tipo-venta').value;
+    const pagoDiv = document.getElementById('venta-pago-campos');
+    const avisoPromo = document.getElementById('aviso-promo');
+    const totalInput = document.getElementById('total-venta');
+
+    if (tipo === 'Promoción') {
+        pagoDiv.style.display = 'none';
+        avisoPromo.style.display = 'block';
+        totalInput.value = '0';
+    } else {
+        pagoDiv.style.display = 'block';
+        avisoPromo.style.display = 'none';
+        totalInput.disabled = false;
+    }
+}
+
+function mostrarOtroVenta(select) {
+    const campo = document.getElementById('campo-otro-venta');
+    const input = document.getElementById('categoria-otro-venta');
+    if (select.value === '__otro__') {
+        campo.style.display = 'block';
+        input.required = true;
+    } else {
+        campo.style.display = 'none';
+        input.required = false;
+        input.value = '';
+    }
+}
+
+// ── Búsqueda de cliente ───────────────────────────────────────────────────────
+function buscarCliente() {
+    const nombre = document.getElementById('input-buscar').value.trim();
+    if (!nombre) return;
+
+    fetch('/cliente?nombre=' + encodeURIComponent(nombre))
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('resultado-cliente').style.display = 'block';
+
+            // Saldo card
+            const saldo = data.saldo;
+            const card = document.getElementById('saldo-card');
+            card.className = 'saldo-card ' + (saldo > 0 ? 'deuda' : 'ok');
+            document.getElementById('saldo-valor').textContent = 'S/ ' + saldo.toFixed(2);
+            document.getElementById('saldo-debe').textContent = 'S/ ' + data.debe_total.toFixed(2);
+            document.getElementById('saldo-cobrado').textContent = 'S/ ' + data.cobrado_total.toFixed(2);
+
+            // Tabla ventas
+            const wrapV = document.getElementById('tabla-ventas-wrap');
+            if (data.ventas.length === 0) {
+                wrapV.innerHTML = '<p class="sin-datos">Sin ventas registradas.</p>';
+            } else {
+                let html = '<table class="tabla-cliente"><thead><tr>' +
+                    '<th>Fecha</th><th>Categoría</th><th>Total</th><th>Debe</th>' +
+                    '</tr></thead><tbody>';
+                data.ventas.forEach(v => {
+                    html += `<tr>
+                        <td>${v.FECHA || ''}</td>
+                        <td>${v.CATEGORIA || ''} ${v['ZONA/CANTIDAD/ENVASE'] ? '<br><small style="color:#aaa">' + v['ZONA/CANTIDAD/ENVASE'] + '</small>' : ''}</td>
+                        <td>${v.TOTAL ? 'S/ ' + v.TOTAL : '—'}</td>
+                        <td style="color:${v.DEBE && v.DEBE !== '0' ? '#C0392B' : 'inherit'}">${v.DEBE && v.DEBE !== '0' ? 'S/ ' + v.DEBE : '—'}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                wrapV.innerHTML = html;
+            }
+
+            // Tabla cobros
+            const wrapC = document.getElementById('tabla-cobros-wrap');
+            if (data.cobros.length === 0) {
+                wrapC.innerHTML = '<p class="sin-datos">Sin cobros registrados.</p>';
+            } else {
+                let html = '<table class="tabla-cliente"><thead><tr>' +
+                    '<th>Fecha</th><th>Monto</th><th>Notas</th>' +
+                    '</tr></thead><tbody>';
+                data.cobros.forEach(c => {
+                    html += `<tr>
+                        <td>${c.FECHA || ''}</td>
+                        <td>S/ ${c.MONTO || '0'}</td>
+                        <td style="color:#888">${c.NOTAS || ''}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                wrapC.innerHTML = html;
+            }
+        })
+        .catch(() => alert('Error al buscar. Verificá la conexión.'));
+}
+
+// ── Inicialización ────────────────────────────────────────────────────────────
+const activeTab = "{{ active_tab }}";
+cambiarTab(activeTab || 'venta');
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+let charts = {};
+let dashCargado = false;
+
+const COLORES = ['#C0392B','#2980B9','#27AE60','#8E44AD','#E67E22','#16A085','#2C3E50','#D35400','#7F8C8D','#F39C12'];
+
+function fmt(n) { return 'S/ ' + Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function mesLabel(ym) { const M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; const[y,m]=ym.split('-'); return M[parseInt(m)-1]+' '+y.slice(2); }
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function setPeriodo(p, btn) {
+    document.querySelectorAll('.periodo-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const hoy = new Date(), hasta = hoy.toISOString().split('T')[0];
+    let desde = '';
+    if      (p==='mes')  desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+    else if (p==='3m')   { const d=new Date(hoy); d.setMonth(d.getMonth()-3); desde=d.toISOString().split('T')[0]; }
+    else if (p==='6m')   { const d=new Date(hoy); d.setMonth(d.getMonth()-6); desde=d.toISOString().split('T')[0]; }
+    else if (p==='anio') desde = new Date(hoy.getFullYear(), 0, 1).toISOString().split('T')[0];
+    document.getElementById('dash-desde').value = desde;
+    document.getElementById('dash-hasta').value = p==='todo' ? '' : hasta;
+    cargarDashboard();
+}
+
+function cargarDashboard() {
+    const desde = document.getElementById('dash-desde').value;
+    const hasta = document.getElementById('dash-hasta').value;
+    document.getElementById('dash-loading').style.display = 'block';
+    document.getElementById('dash-contenido').style.display = 'none';
+
+    let url = '/api/dashboard';
+    const p = [];
+    if (desde) p.push('desde='+desde);
+    if (hasta) p.push('hasta='+hasta);
+    if (p.length) url += '?' + p.join('&');
+
+    fetch(url).then(r => r.json()).then(d => {
+        document.getElementById('dash-loading').style.display = 'none';
+        if (d.sin_datos) { document.getElementById('dash-loading').textContent='Sin datos para este período.'; document.getElementById('dash-loading').style.display='block'; return; }
+
+        // KPIs financieros
+        document.getElementById('kpi-total').textContent     = fmt(d.ventas_total);
+        document.getElementById('kpi-cobrado').textContent   = fmt(d.cobrado_total);
+        document.getElementById('kpi-pendiente').textContent = fmt(d.pendiente_total);
+        document.getElementById('kpi-ticket').textContent    = fmt(d.ticket_promedio);
+        document.getElementById('kpi-tasa').textContent      = d.tasa_cobro + '%';
+        const balEl = document.getElementById('kpi-balance'), balCard = document.getElementById('kpi-balance-card');
+        balEl.textContent = fmt(d.balance_neto);
+        balEl.style.color = d.balance_neto >= 0 ? '#27ae60' : '#C0392B';
+        balCard.classList.remove('kpi-verde','kpi-rojo');
+        balCard.classList.add(d.balance_neto >= 0 ? 'kpi-verde' : 'kpi-rojo');
+        document.getElementById('kpi-gastos-sub').textContent = 'Gastos: ' + fmt(d.total_gastos);
+
+        // KPIs operativos
+        document.getElementById('kpi-atenciones').textContent = d.num_atenciones;
+        document.getElementById('kpi-clientes').textContent   = d.num_clientes;
+        document.getElementById('kpi-promos').textContent     = d.num_promociones;
+        document.getElementById('kpi-trat').textContent       = fmt(d.total_tratamientos);
+        document.getElementById('kpi-prod').textContent       = fmt(d.total_productos);
+        document.getElementById('kpi-gastos').textContent     = fmt(d.total_gastos);
+
+        // Chart: ventas por mes (stacked)
+        destroyChart('meses');
+        charts['meses'] = new Chart(document.getElementById('chart-meses'), {
+            type: 'bar',
+            data: { labels: d.por_mes.map(x=>mesLabel(x.mes)), datasets: [
+                { label:'Cobrado',   data: d.por_mes.map(x=>x.cobrado), backgroundColor:'#27AE60', borderRadius:4 },
+                { label:'Pendiente', data: d.por_mes.map(x=>x.debe),    backgroundColor:'#E74C3C', borderRadius:4 },
+            ]},
+            options: { plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}} }
+        });
+
+        // Chart: métodos de pago (donut)
+        destroyChart('metodos');
+        const metV=[d.ef_efectivo,d.ef_yape,d.ef_plin,d.ef_giro], metL=['Efectivo','Yape','Plin','Giro'];
+        charts['metodos'] = new Chart(document.getElementById('chart-metodos'), {
+            type: 'doughnut',
+            data: { labels: metL.filter((_,i)=>metV[i]>0), datasets:[{ data:metV.filter(v=>v>0), backgroundColor:COLORES, hoverOffset:6 }]},
+            options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
+        });
+
+        // Chart: mix tratamientos/productos (donut)
+        destroyChart('mix');
+        const mixL=['Tratamientos','Productos','Otros'], mixV=[d.total_tratamientos,d.total_productos,d.total_otros];
+        charts['mix'] = new Chart(document.getElementById('chart-mix'), {
+            type: 'doughnut',
+            data: { labels:mixL.filter((_,i)=>mixV[i]>0), datasets:[{ data:mixV.filter(v=>v>0), backgroundColor:['#C0392B','#2980B9','#7F8C8D'], hoverOffset:6 }]},
+            options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
+        });
+
+        // Chart: top clientes
+        destroyChart('clientes');
+        charts['clientes'] = new Chart(document.getElementById('chart-clientes'), {
+            type:'bar',
+            data:{ labels:d.top_clientes.map(x=>x.cliente), datasets:[{ label:'Facturado (S/)', data:d.top_clientes.map(x=>x.total), backgroundColor:COLORES, borderRadius:4 }]},
+            options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Visitas: '+d.top_clientes[ctx.dataIndex].visitas}}}, scales:{x:{beginAtZero:true}} }
+        });
+
+        // Chart: top categorías
+        destroyChart('cats');
+        charts['cats'] = new Chart(document.getElementById('chart-cats'), {
+            type:'bar',
+            data:{ labels:d.por_categoria.map(x=>x.categoria), datasets:[{ label:'Total (S/)', data:d.por_categoria.map(x=>x.total), backgroundColor:'#C0392B', borderRadius:4 }]},
+            options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Veces: '+d.por_categoria[ctx.dataIndex].count}}}, scales:{x:{beginAtZero:true}} }
+        });
+
+        // Tabla recientes
+        let html='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Total</th><th>Debe</th></tr></thead><tbody>';
+        d.recientes.forEach(r => {
+            html+=`<tr><td>${r.fecha}</td><td>${r.cliente}</td><td>${r.categoria}</td><td>${r.total?fmt(r.total):'—'}</td><td>${r.debe>0?'<span class="debe-badge">'+fmt(r.debe)+'</span>':'—'}</td></tr>`;
+        });
+        document.getElementById('tabla-recientes').innerHTML = html + '</tbody></table>';
+
+        document.getElementById('dash-contenido').style.display = 'block';
+        dashCargado = true;
+    }).catch(() => {
+        document.getElementById('dash-loading').textContent = 'Error al cargar datos.';
+        document.getElementById('dash-loading').style.display = 'block';
+    });
+}
+
+const _cambiarTabOriginal = cambiarTab;
+cambiarTab = function(tab) {
+    _cambiarTabOriginal(tab);
+    if (tab === 'dashboard' && !dashCargado) {
+        setPeriodo('todo', document.querySelector('.periodo-btn'));
+    }
+};
+
+// Fechas de hoy por defecto
+['fecha-venta', 'fecha-gasto', 'fecha-cobro'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.valueAsDate = new Date();
+});
+</script>
 </body>
 </html>
