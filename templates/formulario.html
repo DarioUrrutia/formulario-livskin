@@ -11,8 +11,6 @@
             background: #f5f5f5;
             display: flex;
             justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             padding: 20px;
         }
         .card {
@@ -20,38 +18,57 @@
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 420px;
+            max-width: 480px;
             overflow: hidden;
+            margin-bottom: 30px;
         }
         .header {
-            background: #C0392B;
-            color: white;
+            background: white;
             text-align: center;
             padding: 20px;
-            font-size: 20px;
-            font-weight: bold;
-            letter-spacing: 1px;
+            border-bottom: 3px solid #C0392B;
         }
-        .form-body { padding: 30px; }
-        .field { margin-bottom: 18px; }
+        .header img {
+            max-width: 200px;
+            height: auto;
+        }
+        .form-body { padding: 24px; }
+        .seccion {
+            font-size: 11px;
+            font-weight: bold;
+            color: #C0392B;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0 10px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 4px;
+        }
+        .field { margin-bottom: 14px; }
         label {
             display: block;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
             color: #555;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
         }
-        input {
+        input, select {
             width: 100%;
-            padding: 12px 14px;
+            padding: 10px 12px;
             border: 1.5px solid #ddd;
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 14px;
             transition: border 0.2s;
+            background: white;
         }
-        input:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: #C0392B;
+        }
+        .fila-dos {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
         button {
             width: 100%;
@@ -63,12 +80,12 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 20px;
             letter-spacing: 1px;
         }
         button:hover { background: #a93226; }
         .mensaje {
-            margin: 15px 30px 0;
+            margin: 12px 24px 0;
             padding: 12px;
             border-radius: 8px;
             text-align: center;
@@ -86,7 +103,9 @@
 </head>
 <body>
     <div class="card">
-        <div class="header">FORMULARIO LIVSKIN</div>
+        <div class="header">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Livskin Logo">
+        </div>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -99,22 +118,101 @@
         {% endwith %}
 
         <form class="form-body" method="POST">
-            <div class="field">
-                <label>NOMBRE</label>
-                <input type="text" name="nombre" placeholder="Ingresa el nombre" autofocus>
+
+            <div class="seccion">Informacion General</div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Fecha</label>
+                    <input type="date" name="fecha">
+                </div>
+                <div class="field">
+                    <label>Telefono</label>
+                    <input type="tel" name="telefono" placeholder="Numero">
+                </div>
             </div>
-            <div class="field">
-                <label>APELLIDO</label>
-                <input type="text" name="apellido" placeholder="Ingresa el apellido">
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Area</label>
+                    <input type="text" name="area" placeholder="Area">
+                </div>
+                <div class="field">
+                    <label>Tipo</label>
+                    <input type="text" name="tipo" placeholder="Tipo">
+                </div>
             </div>
+
             <div class="field">
-                <label>TRATAMIENTO</label>
-                <input type="text" name="tratamiento" placeholder="Tipo de tratamiento">
+                <label>Categoria</label>
+                <input type="text" name="categoria" placeholder="Categoria">
             </div>
+
             <div class="field">
-                <label>COSTO</label>
-                <input type="number" name="costo" placeholder="0.00" step="0.01">
+                <label>Zona / Cantidad / Envase</label>
+                <input type="text" name="zona_cantidad_envase" placeholder="Zona / Cantidad / Envase">
             </div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Proxima Cita</label>
+                    <input type="date" name="proxima_cita">
+                </div>
+                <div class="field">
+                    <label>Cumpleanos</label>
+                    <input type="date" name="cumpleanos">
+                </div>
+            </div>
+
+            <div class="seccion">Pago</div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Moneda</label>
+                    <select name="moneda">
+                        <option value="PEN">PEN - Soles</option>
+                        <option value="USD">USD - Dolares</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Total</label>
+                    <input type="number" name="total" placeholder="0.00" step="0.01">
+                </div>
+            </div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Efectivo</label>
+                    <input type="number" name="efectivo" placeholder="0.00" step="0.01">
+                </div>
+                <div class="field">
+                    <label>Yape</label>
+                    <input type="number" name="yape" placeholder="0.00" step="0.01">
+                </div>
+            </div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Plin</label>
+                    <input type="number" name="plin" placeholder="0.00" step="0.01">
+                </div>
+                <div class="field">
+                    <label>Giro</label>
+                    <input type="number" name="giro" placeholder="0.00" step="0.01">
+                </div>
+            </div>
+
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Debe</label>
+                    <input type="number" name="debe" placeholder="0.00" step="0.01">
+                </div>
+                <div class="field">
+                    <label>Pago Saldo</label>
+                    <input type="number" name="pago_saldo" placeholder="0.00" step="0.01">
+                </div>
+            </div>
+
             <button type="submit">GUARDAR</button>
         </form>
     </div>
