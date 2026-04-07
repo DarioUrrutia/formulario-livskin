@@ -1,3 +1,4 @@
 flask
-openpyxl
+gspread
+google-auth
 gunicorn

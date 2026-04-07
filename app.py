@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-import openpyxl
+import gspread
+from google.oauth2.service_account import Credentials
 import os
+import json
 
 app = Flask(__name__)
 app.secret_key = "livskin2024"
 
-ARCHIVO_EXCEL = "Datos_Livskin.xlsx"
+SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 
 ENCABEZADOS = [
     "FECHA", "AREA", "TIPO", "CATEGORIA", "ZONA/CANTIDAD/ENVASE",
@@ -13,13 +15,27 @@ ENCABEZADOS = [
     "YAPE", "PLIN", "GIRO", "DEBE", "PAGO SALDO", "CUMPLEANOS"
 ]
 
-def inicializar_excel():
-    if not os.path.exists(ARCHIVO_EXCEL):
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Registros"
-        ws.append(ENCABEZADOS)
-        wb.save(ARCHIVO_EXCEL)
+def get_sheet():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    # Usar variable de entorno en Render, o archivo local en desarrollo
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+    if creds_json:
+        creds_dict = json.loads(creds_json)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    else:
+        creds = Credentials.from_service_account_file(
+            "livskin-formulario-56d6d2a0eac6.json", scopes=scopes
+        )
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    return sheet
+
+def inicializar_sheet(sheet):
+    if sheet.row_count == 0 or sheet.cell(1, 1).value != "FECHA":
+        sheet.insert_row(ENCABEZADOS, 1)
 
 @app.route("/", methods=["GET", "POST"])
 def formulario():
@@ -43,11 +59,9 @@ def formulario():
             request.form.get("cumpleanos", ""),
         ]
 
-        inicializar_excel()
-        wb = openpyxl.load_workbook(ARCHIVO_EXCEL)
-        ws = wb.active
-        ws.append(datos)
-        wb.save(ARCHIVO_EXCEL)
+        sheet = get_sheet()
+        inicializar_sheet(sheet)
+        sheet.append_row(datos)
 
         flash("Registro guardado correctamente.")
         return redirect(url_for("formulario"))
@@ -55,5 +69,4 @@ def formulario():
     return render_template("formulario.html")
 
 if __name__ == "__main__":
-    inicializar_excel()
     app.run(debug=True)

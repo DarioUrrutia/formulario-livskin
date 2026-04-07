@@ -4,3 +4,4 @@ formulario_livskin.pyw
 __pycache__/
 *.pyc
 .env
+*.json
