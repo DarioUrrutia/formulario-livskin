@@ -198,6 +198,18 @@
         }
         .sin-datos { color: #aaa; font-size: 13px; text-align: center; padding: 20px 0; }
         #resultado-cliente { display: none; }
+
+        /* Historial por día */
+        .dia-block { border: 1px solid #eee; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+        .dia-header { background: #f5f5f5; padding: 8px 12px; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eee; }
+        .dia-seccion-lbl { padding: 7px 12px 2px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #C0392B; }
+        .dia-seccion-lbl.cobro-lbl { color: #27ae60; }
+        .dia-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 12px 6px; border-bottom: 1px solid #fafafa; font-size: 13px; }
+        .dia-concepto { flex: 1; color: #333; line-height: 1.4; }
+        .dia-cod { font-size: 10px; color: #bbb; margin-left: 4px; }
+        .dia-monto { font-weight: bold; color: #333; white-space: nowrap; margin-left: 8px; }
+        .dia-monto.cobro { color: #27ae60; }
+        .dia-footer { background: #fafafa; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; border-top: 1px solid #eee; flex-wrap: wrap; gap: 4px; }
     </style>
 </head>
 <body>
@@ -472,11 +484,8 @@
                 </div>
             </div>
 
-            <div class="subtitulo-tabla">Ventas</div>
-            <div id="tabla-ventas-wrap"></div>
-
-            <div class="subtitulo-tabla">Cobros recibidos</div>
-            <div id="tabla-cobros-wrap"></div>
+            <div class="subtitulo-tabla">Historial</div>
+            <div id="historial-cliente"></div>
         </div>
     </div>
 
@@ -747,6 +756,13 @@
     .debe-badge { color:#C0392B; font-weight:bold; font-size:11px; }
 </style>
 <script>
+// ── Evitar que el scroll del mouse cambie inputs numéricos ───────────────────
+document.addEventListener('wheel', function() {
+    if (document.activeElement && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+    }
+}, { passive: true });
+
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function cambiarTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -1167,6 +1183,13 @@ function actualizarDistribucion() {
 function actualizarMonedaBadges() {} // deprecated, mantenida para compatibilidad
 
 // ── Búsqueda de cliente ───────────────────────────────────────────────────────
+function parseFechaStr(s) {
+    if (!s) return new Date(0);
+    const p = s.split('/');
+    if (p.length === 3) return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    return new Date(s);
+}
+
 function buscarCliente() {
     const nombre = document.getElementById('input-buscar').value.trim();
     if (!nombre) return;
@@ -1176,72 +1199,107 @@ function buscarCliente() {
         .then(data => {
             document.getElementById('resultado-cliente').style.display = 'block';
 
-            // Saldo card  (saldo = total facturado - total cobrado)
+            // ── Saldo card ──
             const saldo = data.saldo;
             const card = document.getElementById('saldo-card');
-            card.className = 'saldo-card ' + (saldo > 0.5 ? 'deuda' : 'ok');
             if (saldo > 0.5) {
+                card.className = 'saldo-card deuda';
                 document.querySelector('#saldo-card .saldo-label').textContent = 'Saldo pendiente';
                 document.getElementById('saldo-valor').textContent = 'S/ ' + saldo.toFixed(2);
             } else if (saldo < -0.5) {
+                card.className = 'saldo-card ok';
                 document.querySelector('#saldo-card .saldo-label').textContent = 'Saldo a favor';
                 document.getElementById('saldo-valor').textContent = 'S/ ' + Math.abs(saldo).toFixed(2);
             } else {
+                card.className = 'saldo-card ok';
                 document.querySelector('#saldo-card .saldo-label').textContent = 'Al día';
                 document.getElementById('saldo-valor').textContent = 'S/ 0.00';
             }
             document.getElementById('saldo-debe').textContent    = 'S/ ' + data.facturado_total.toFixed(2);
             document.getElementById('saldo-cobrado').textContent = 'S/ ' + data.cobrado_total.toFixed(2);
 
-            // Tabla ventas
-            const wrapV = document.getElementById('tabla-ventas-wrap');
-            if (data.ventas.length === 0) {
-                wrapV.innerHTML = '<p class="sin-datos">Sin ventas registradas.</p>';
-            } else {
-                let html = '<table class="tabla-cliente"><thead><tr>' +
-                    '<th>Fecha</th><th>Código</th><th>Categoría</th><th>Total</th><th>Debe</th>' +
-                    '</tr></thead><tbody>';
-                data.ventas.forEach(v => {
-                    const totalVal = v['TOTAL S/ (PEN)'] || v['TOTAL'] || '';
-                    html += `<tr>
-                        <td>${v.FECHA || ''}</td>
-                        <td style="font-size:11px;color:#bbb;">${v.COD_ITEM || '—'}</td>
-                        <td>${v.CATEGORIA || ''} ${v['ZONA/CANTIDAD/ENVASE'] ? '<br><small style="color:#aaa">' + v['ZONA/CANTIDAD/ENVASE'] + '</small>' : ''}</td>
-                        <td>${totalVal ? 'S/ ' + totalVal : '—'}</td>
-                        <td style="color:${v.DEBE && v.DEBE !== '0' ? '#C0392B' : 'inherit'}">${v.DEBE && v.DEBE !== '0' ? 'S/ ' + v.DEBE : '—'}</td>
-                    </tr>`;
-                });
-                html += '</tbody></table>';
-                wrapV.innerHTML = html;
+            // ── Historial agrupado por día ──
+            const wrapH = document.getElementById('historial-cliente');
+
+            if (data.ventas.length === 0 && data.cobros.length === 0) {
+                wrapH.innerHTML = '<p class="sin-datos">Sin historial registrado.</p>';
+                return;
             }
 
-            // Tabla cobros
-            const wrapC = document.getElementById('tabla-cobros-wrap');
-            if (data.cobros.length === 0) {
-                wrapC.innerHTML = '<p class="sin-datos">Sin cobros registrados.</p>';
-            } else {
-                let html = '<table class="tabla-cliente"><thead><tr>' +
-                    '<th>Fecha</th><th>Tratamiento / Producto</th><th>Monto</th><th>Método</th>' +
-                    '</tr></thead><tbody>';
-                data.cobros.forEach(c => {
-                    const concepto = c.CATEGORIA || c.NOTAS || '—';
-                    const codItem  = c.COD_ITEM  ? `<br><small style="color:#bbb;">${c.COD_ITEM}</small>` : '';
-                    const metodos  = [];
-                    if (parseFloat(c.EFECTIVO) > 0) metodos.push('Efectivo');
-                    if (parseFloat(c.YAPE)     > 0) metodos.push('Yape');
-                    if (parseFloat(c.PLIN)     > 0) metodos.push('Plin');
-                    if (parseFloat(c.GIRO)     > 0) metodos.push('Giro');
-                    const metodo   = metodos.join(' + ') || '—';
-                    html += `<tr>
-                        <td>${c.FECHA || ''}</td>
-                        <td>${concepto}${codItem}</td>
-                        <td style="white-space:nowrap;">S/ ${c.MONTO || '0'}</td>
-                        <td style="font-size:11px;color:#555;">${metodo}</td>
-                    </tr>`;
-                });
-                html += '</tbody></table>';
-                wrapC.innerHTML = html;
-            }
+            // Recolectar todas las fechas únicas
+            const diasSet = new Set();
+            data.ventas.forEach(v => { if (v.FECHA) diasSet.add(v.FECHA); });
+            data.cobros.forEach(c => { if (c.FECHA) diasSet.add(c.FECHA); });
+
+            // Ordenar descendente (más reciente primero)
+            const dias = Array.from(diasSet).sort((a, b) => parseFechaStr(b) - parseFechaStr(a));
+
+            let html = '';
+            dias.forEach(dia => {
+                const ventasDia  = data.ventas.filter(v => v.FECHA === dia);
+                const cobrosDia  = data.cobros.filter(c => c.FECHA === dia);
+
+                const totalVendido  = ventasDia.reduce((s, v) => s + parseFloat(v['TOTAL S/ (PEN)'] || v['TOTAL'] || 0), 0);
+                const totalCobrado  = cobrosDia.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+
+                html += `<div class="dia-block"><div class="dia-header">${dia}</div>`;
+
+                // Ventas del día
+                if (ventasDia.length > 0) {
+                    html += `<div class="dia-seccion-lbl">Ventas</div>`;
+                    ventasDia.forEach(v => {
+                        const totalVal = v['TOTAL S/ (PEN)'] || v['TOTAL'] || '0';
+                        const zona = v['ZONA/CANTIDAD/ENVASE'] ? `<br><small style="color:#aaa">${v['ZONA/CANTIDAD/ENVASE']}</small>` : '';
+                        const debe = v.DEBE && v.DEBE !== '0' ? `<div style="font-size:10px;color:#C0392B;">Debe: S/ ${v.DEBE}</div>` : '';
+                        html += `<div class="dia-row">
+                            <div class="dia-concepto">
+                                ${v.CATEGORIA || v.TIPO || '—'}
+                                ${v.COD_ITEM ? `<span class="dia-cod">${v.COD_ITEM}</span>` : ''}
+                                ${zona}
+                            </div>
+                            <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+                                <div class="dia-monto">S/ ${totalVal}</div>${debe}
+                            </div>
+                        </div>`;
+                    });
+                }
+
+                // Cobros del día
+                if (cobrosDia.length > 0) {
+                    html += `<div class="dia-seccion-lbl cobro-lbl">Cobros recibidos</div>`;
+                    cobrosDia.forEach(c => {
+                        const metodos = [];
+                        if (parseFloat(c.EFECTIVO) > 0) metodos.push('Efectivo');
+                        if (parseFloat(c.YAPE)     > 0) metodos.push('Yape');
+                        if (parseFloat(c.PLIN)     > 0) metodos.push('Plin');
+                        if (parseFloat(c.GIRO)     > 0) metodos.push('Giro');
+                        const metodo   = metodos.join(' + ') || c.NOTAS || '—';
+                        const concepto = c.CATEGORIA || '—';
+                        const codItem  = c.COD_ITEM ? `<span class="dia-cod">${c.COD_ITEM}</span>` : '';
+                        html += `<div class="dia-row">
+                            <div class="dia-concepto">
+                                ${concepto}${codItem}
+                                <br><small style="color:#888;">${metodo}</small>
+                            </div>
+                            <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
+                        </div>`;
+                    });
+                }
+
+                // Footer del día
+                html += `<div class="dia-footer">`;
+                if (ventasDia.length > 0)
+                    html += `<span style="color:#888;">Vendido: <strong>S/ ${Math.round(totalVendido)}</strong></span>`;
+                if (cobrosDia.length > 0)
+                    html += `<span style="color:#27ae60;">Cobrado: <strong>S/ ${Math.round(totalCobrado)}</strong></span>`;
+                if (ventasDia.length === 0 && cobrosDia.length > 0)
+                    html += `<span style="color:#27ae60;font-style:italic;">Solo cobro (abono deuda / pago adelantado)</span>`;
+                if (ventasDia.length > 0 && cobrosDia.length === 0)
+                    html += `<span style="color:#C0392B;font-style:italic;">Sin pago registrado este día</span>`;
+                html += `</div></div>`;
+            });
+
+            wrapH.innerHTML = html;
         })
         .catch(() => alert('Error al buscar. Verificá la conexión.'));
 }
