@@ -467,7 +467,7 @@
                 <div class="saldo-label">Saldo pendiente</div>
                 <div class="saldo-numero" id="saldo-valor">S/ 0.00</div>
                 <div style="font-size:12px;color:#666;margin-top:4px;">
-                    Debe: <span id="saldo-debe">0</span> &nbsp;|&nbsp;
+                    Facturado: <span id="saldo-debe">0</span> &nbsp;|&nbsp;
                     Cobrado: <span id="saldo-cobrado">0</span>
                 </div>
             </div>
@@ -853,19 +853,20 @@ let tasasCache = {};   // { "2026-04-08": { USD: 3.72, EUR: 4.10 }, ... }
 let tcPromesa  = null; // promesa de la última carga en curso
 
 async function fetchTasasPorFecha(fecha) {
-    // Si ya tenemos la tasa para esta fecha, no fetchar de nuevo
-    if (tasasCache[fecha]) return;
-    // Usar 'latest' para hoy, o la fecha específica para días pasados
     const hoy = new Date().toISOString().split('T')[0];
-    const endpoint = (!fecha || fecha === hoy) ? 'latest' : fecha;
+    const clave = fecha || hoy;
+    if (tasasCache[clave]) return; // ya tenemos esta fecha
+    const tag = (!fecha || fecha === hoy) ? 'latest' : fecha;
     try {
-        const r = await fetch(`https://api.frankfurter.app/${endpoint}?from=USD&to=PEN,EUR`);
+        // currency-api: libre, sin clave, incluye PEN (sol peruano)
+        const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${tag}/v1/currencies/usd.json`;
+        const r    = await fetch(url);
         const data = await r.json();
-        tasasCache[fecha || hoy] = {
-            USD: Math.round(data.rates.PEN * 100) / 100,
-            EUR: Math.round((data.rates.PEN / data.rates.EUR) * 100) / 100,
+        tasasCache[clave] = {
+            USD: Math.round(data.usd.pen  * 100) / 100,
+            EUR: Math.round((data.usd.pen / data.usd.eur) * 100) / 100,
         };
-    } catch(e) { /* sin conexión — el usuario ingresa manualmente */ }
+    } catch(e) { /* sin conexión — ingresar manualmente */ }
 }
 
 function getFechaVenta() {
@@ -1102,12 +1103,21 @@ function buscarCliente() {
         .then(data => {
             document.getElementById('resultado-cliente').style.display = 'block';
 
-            // Saldo card
+            // Saldo card  (saldo = total facturado - total cobrado)
             const saldo = data.saldo;
             const card = document.getElementById('saldo-card');
-            card.className = 'saldo-card ' + (saldo > 0 ? 'deuda' : 'ok');
-            document.getElementById('saldo-valor').textContent = 'S/ ' + saldo.toFixed(2);
-            document.getElementById('saldo-debe').textContent = 'S/ ' + data.debe_total.toFixed(2);
+            card.className = 'saldo-card ' + (saldo > 0.5 ? 'deuda' : 'ok');
+            if (saldo > 0.5) {
+                document.querySelector('#saldo-card .saldo-label').textContent = 'Saldo pendiente';
+                document.getElementById('saldo-valor').textContent = 'S/ ' + saldo.toFixed(2);
+            } else if (saldo < -0.5) {
+                document.querySelector('#saldo-card .saldo-label').textContent = 'Saldo a favor';
+                document.getElementById('saldo-valor').textContent = 'S/ ' + Math.abs(saldo).toFixed(2);
+            } else {
+                document.querySelector('#saldo-card .saldo-label').textContent = 'Al día';
+                document.getElementById('saldo-valor').textContent = 'S/ 0.00';
+            }
+            document.getElementById('saldo-debe').textContent    = 'S/ ' + data.facturado_total.toFixed(2);
             document.getElementById('saldo-cobrado').textContent = 'S/ ' + data.cobrado_total.toFixed(2);
 
             // Tabla ventas
@@ -1136,13 +1146,15 @@ function buscarCliente() {
                 wrapC.innerHTML = '<p class="sin-datos">Sin cobros registrados.</p>';
             } else {
                 let html = '<table class="tabla-cliente"><thead><tr>' +
-                    '<th>Fecha</th><th>Monto</th><th>Notas</th>' +
+                    '<th>Fecha</th><th>Tratamiento / Producto</th><th>Monto</th>' +
                     '</tr></thead><tbody>';
                 data.cobros.forEach(c => {
+                    const concepto = c.CATEGORIA || c.NOTAS || '—';
+                    const codItem  = c.COD_ITEM  ? `<br><small style="color:#bbb;">${c.COD_ITEM}</small>` : '';
                     html += `<tr>
                         <td>${c.FECHA || ''}</td>
-                        <td>S/ ${c.MONTO || '0'}</td>
-                        <td style="color:#888">${c.NOTAS || ''}</td>
+                        <td>${concepto}${codItem}</td>
+                        <td style="white-space:nowrap;">S/ ${c.MONTO || '0'}</td>
                     </tr>`;
                 });
                 html += '</tbody></table>';

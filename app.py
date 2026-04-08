@@ -344,33 +344,31 @@ def guardar_cobro():
 def ver_cliente():
     nombre = request.args.get("nombre", "").strip().lower()
     if not nombre:
-        return jsonify({"ventas": [], "cobros": [], "debe_total": 0, "cobrado_total": 0, "saldo": 0})
+        return jsonify({"ventas": [], "cobros": [], "facturado_total": 0, "cobrado_total": 0, "saldo": 0})
 
     ventas_ws, _, cobros_ws, _ = get_sheets()
 
-    # Ventas del cliente
+    # Ventas del cliente — suma TOTAL (índice 12), no DEBE
     todas_ventas = ventas_ws.get_all_values()
     ventas_cliente = []
-    debe_total = 0.0
+    facturado_total = 0.0
     if len(todas_ventas) > 1:
         headers = todas_ventas[0]
         for fila in todas_ventas[1:]:
-            # CLIENTE está en índice 3 (después de COD_CLIENTE)
             if len(fila) > 3 and fila[3].strip().lower() == nombre:
                 ventas_cliente.append(dict(zip(headers, fila)))
                 try:
-                    debe_total += float(str(fila[17]).replace(",", ".") or 0)
+                    facturado_total += float(str(fila[12]).replace(",", ".") or 0)
                 except (ValueError, IndexError):
                     pass
 
-    # Cobros del cliente
+    # Cobros del cliente — suma MONTO (índice 4)
     todos_cobros = cobros_ws.get_all_values()
     cobros_cliente = []
     cobrado_total = 0.0
     if len(todos_cobros) > 1:
         headers_c = todos_cobros[0]
         for fila in todos_cobros[1:]:
-            # CLIENTE está en índice 3 (después de COD_CLIENTE)
             if len(fila) > 3 and fila[3].strip().lower() == nombre:
                 cobros_cliente.append(dict(zip(headers_c, fila)))
                 try:
@@ -378,12 +376,13 @@ def ver_cliente():
                 except (ValueError, IndexError):
                     pass
 
+    saldo = round(facturado_total - cobrado_total, 2)
     return jsonify({
         "ventas": ventas_cliente,
         "cobros": cobros_cliente,
-        "debe_total": debe_total,
-        "cobrado_total": cobrado_total,
-        "saldo": debe_total - cobrado_total
+        "facturado_total": facturado_total,
+        "cobrado_total":   cobrado_total,
+        "saldo":           saldo
     })
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
