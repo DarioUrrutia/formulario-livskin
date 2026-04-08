@@ -99,8 +99,15 @@ def obtener_clientes(sheet_ventas):
     todos = sheet_ventas.get_all_values()
     nombres = set()
     for fila in todos[1:]:
-        if len(fila) > 3 and fila[3].strip():
-            nombres.add(fila[3].strip())
+        if not any(fila):
+            continue
+        # Formato nuevo: COD_CLIENTE en [2], CLIENTE en [3]
+        if len(fila) > 2 and str(fila[2]).startswith("LIVCLIENT"):
+            if len(fila) > 3 and fila[3].strip():
+                nombres.add(fila[3].strip())
+        # Formato antiguo: CLIENTE en [2]
+        elif len(fila) > 2 and fila[2].strip():
+            nombres.add(fila[2].strip())
     return sorted(nombres)
 
 # ── Página principal ──────────────────────────────────────────────────────────
