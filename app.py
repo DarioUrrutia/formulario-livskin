@@ -14,7 +14,7 @@ SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 ENCABEZADOS_VENTAS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
     "CATEGORIA", "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "CUMPLEANOS",
-    "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO"
+    "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO", "TC"
 ]
 
 ENCABEZADOS_GASTOS = [
@@ -180,12 +180,15 @@ def guardar_venta():
             if categoria == "__otro__":
                 categoria = request.form.get(f"categoria_otro_{i}", "")
 
-            zona        = request.form.get(f"zona_{i}", "")
-            precio_item = request.form.get(f"total_item_{i}", "0") or "0"
-            pago_item   = request.form.get(f"pago_item_{i}", "0") or "0"
-            precio_f    = to_float(precio_item)
-            pago_f      = to_float(pago_item)
-            debe_item   = max(0.0, precio_f - pago_f)
+            zona         = request.form.get(f"zona_{i}", "")
+            moneda_item  = request.form.get(f"moneda_item_{i}", "Soles")
+            tc_item      = request.form.get(f"tc_item_{i}", "") or ""
+            # total_item_i es el precio en Soles (calculado por JS)
+            precio_soles = request.form.get(f"total_item_{i}", "0") or "0"
+            pago_item    = request.form.get(f"pago_item_{i}", "0") or "0"
+            precio_f     = to_float(precio_soles)
+            pago_f       = to_float(pago_item)
+            debe_item    = max(0.0, precio_f - pago_f)
             total_contratado += precio_f
 
             # Código de ítem según tipo
@@ -204,10 +207,11 @@ def guardar_venta():
 
             num = siguiente_numero(ventas)
             datos = [num, fecha, cod_cliente, cliente, telefono, tipo, cod_item,
-                     categoria, zona, "", cumpleanos, moneda, precio_item,
+                     categoria, zona, "", cumpleanos, moneda_item, precio_soles,
                      ef, ya, pl, gi,
-                     round(debe_item, 2) if debe_item else "",
-                     round(pago_f, 2) if pago_f else ""]
+                     round(debe_item) if debe_item else "",
+                     round(pago_f)    if pago_f    else "",
+                     tc_item]
             ventas.append_row(datos)
             filas_guardadas += 1
 
