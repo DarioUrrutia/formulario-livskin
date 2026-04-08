@@ -14,7 +14,7 @@ SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 ENCABEZADOS_VENTAS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
     "CATEGORIA", "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "FECHA_NAC",
-    "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO", "TC"
+    "MONEDA", "TOTAL S/ (PEN)", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO", "TC"
 ]
 
 ENCABEZADOS_GASTOS = [
@@ -422,9 +422,10 @@ def api_dashboard():
     desde = parse_fecha(desde_str)
     hasta = parse_fecha(hasta_str)
 
-    ventas_ws, gastos_ws, _, _ = get_sheets()
+    ventas_ws, gastos_ws, cobros_ws, _ = get_sheets()
     todos       = ventas_ws.get_all_values()
     todos_gasto = gastos_ws.get_all_values()
+    todos_cobros = cobros_ws.get_all_values()
 
     if len(todos) < 2:
         return jsonify({"sin_datos": True})
@@ -442,19 +443,19 @@ def api_dashboard():
             continue
         if hasta and fecha > hasta:
             continue
-        cobrado = parse_num(g(11)) + parse_num(g(12)) + parse_num(g(13)) + parse_num(g(14))
+        cobrado = parse_num(g(13)) + parse_num(g(14)) + parse_num(g(15)) + parse_num(g(16))
         filas.append({
             "fecha":     fecha,
-            "cliente":   g(2),
-            "tipo":      g(4),
-            "categoria": g(5),
-            "total":     parse_num(g(10)),
+            "cliente":   g(3),
+            "tipo":      g(5),
+            "categoria": g(7),
+            "total":     parse_num(g(12)),
             "cobrado":   cobrado,
-            "efectivo":  parse_num(g(11)),
-            "yape":      parse_num(g(12)),
-            "plin":      parse_num(g(13)),
-            "giro":      parse_num(g(14)),
-            "debe":      parse_num(g(15)),
+            "efectivo":  parse_num(g(13)),
+            "yape":      parse_num(g(14)),
+            "plin":      parse_num(g(15)),
+            "giro":      parse_num(g(16)),
+            "debe":      parse_num(g(17)),
         })
 
     # ── Leer gastos del mismo período ─────────────────────────────────────────
@@ -472,6 +473,31 @@ def api_dashboard():
             continue
         total_gastos += parse_num(gg(5))
 
+    # ── Leer cobros del mismo período ─────────────────────────────────────────
+    cobros_list = []
+    for row in todos_cobros[1:]:
+        if not any(row):
+            continue
+        def gc(i, r=row): return r[i].strip() if i < len(r) else ""
+        fecha_c = parse_fecha(gc(1))
+        if not fecha_c:
+            continue
+        if desde and fecha_c < desde:
+            continue
+        if hasta and fecha_c > hasta:
+            continue
+        cobros_list.append({
+            "fecha":     fecha_c,
+            "cliente":   gc(3),
+            "monto":     parse_num(gc(4)),
+            "efectivo":  parse_num(gc(5)),
+            "yape":      parse_num(gc(6)),
+            "plin":      parse_num(gc(7)),
+            "giro":      parse_num(gc(8)),
+            "cod_item":  gc(10),
+            "categoria": gc(11),
+        })
+
     if not filas:
         return jsonify({
             "ventas_total": 0, "cobrado_total": 0, "pendiente_total": 0,
@@ -479,7 +505,9 @@ def api_dashboard():
             "num_clientes": 0, "num_promociones": 0, "total_gastos": 0,
             "balance_neto": 0, "ef_efectivo": 0, "ef_yape": 0, "ef_plin": 0, "ef_giro": 0,
             "pct_tratamientos": 0, "pct_productos": 0,
-            "por_mes": [], "top_clientes": [], "por_categoria": [], "recientes": []
+            "por_mes": [], "top_clientes": [], "por_categoria": [], "recientes": [],
+            "cobros_recientes": [],
+            "cobros_ef_efectivo": 0, "cobros_ef_yape": 0, "cobros_ef_plin": 0, "cobros_ef_giro": 0,
         })
 
     # ── KPIs financieros ──────────────────────────────────────────────────────
@@ -549,6 +577,25 @@ def api_dashboard():
         for f in recientes
     ]
 
+    # ── Cobros: agregados y recientes ─────────────────────────────────────────
+    cobros_ef_efectivo = sum(c["efectivo"] for c in cobros_list)
+    cobros_ef_yape     = sum(c["yape"]     for c in cobros_list)
+    cobros_ef_plin     = sum(c["plin"]     for c in cobros_list)
+    cobros_ef_giro     = sum(c["giro"]     for c in cobros_list)
+    cobros_recientes_sorted = sorted(cobros_list, key=lambda x: x["fecha"], reverse=True)[:10]
+    cobros_recientes_out = []
+    for c in cobros_recientes_sorted:
+        metodos = [k for k, v in [("Efectivo", c["efectivo"]), ("Yape", c["yape"]),
+                                   ("Plin", c["plin"]), ("Giro", c["giro"])] if v > 0]
+        cobros_recientes_out.append({
+            "fecha":     c["fecha"].strftime("%d/%m/%Y"),
+            "cliente":   c["cliente"],
+            "monto":     round(c["monto"], 2),
+            "metodo":    " + ".join(metodos) if metodos else "—",
+            "categoria": c["categoria"],
+            "cod_item":  c["cod_item"],
+        })
+
     return jsonify({
         # KPIs financieros
         "ventas_total":    round(ventas_total, 2),
@@ -562,7 +609,7 @@ def api_dashboard():
         "num_atenciones":  num_atenciones,
         "num_clientes":    num_clientes,
         "num_promociones": num_promociones,
-        # Métodos de pago
+        # Métodos de pago (ventas)
         "ef_efectivo": round(ef_efectivo, 2),
         "ef_yape":     round(ef_yape, 2),
         "ef_plin":     round(ef_plin, 2),
@@ -576,6 +623,12 @@ def api_dashboard():
         "top_clientes":  top_clientes,
         "por_categoria": por_categoria,
         "recientes":     recientes_out,
+        # Cobros
+        "cobros_ef_efectivo": round(cobros_ef_efectivo, 2),
+        "cobros_ef_yape":     round(cobros_ef_yape, 2),
+        "cobros_ef_plin":     round(cobros_ef_plin, 2),
+        "cobros_ef_giro":     round(cobros_ef_giro, 2),
+        "cobros_recientes":   cobros_recientes_out,
     })
 
 if __name__ == "__main__":

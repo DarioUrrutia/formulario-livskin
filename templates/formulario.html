@@ -503,100 +503,158 @@
 
         <div id="dash-contenido" style="display:none;">
 
-            <!-- Fila 1: financieros -->
-            <div class="kpi-seccion">Financiero</div>
-            <div class="kpi-grid kpi-3">
-                <div class="kpi-card">
-                    <div class="kpi-label">Total Facturado</div>
-                    <div class="kpi-valor" id="kpi-total">—</div>
-                </div>
-                <div class="kpi-card kpi-verde">
-                    <div class="kpi-label">Total Cobrado</div>
-                    <div class="kpi-valor" id="kpi-cobrado">—</div>
-                </div>
-                <div class="kpi-card kpi-rojo">
-                    <div class="kpi-label">Por Cobrar</div>
-                    <div class="kpi-valor" id="kpi-pendiente">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Ticket Promedio</div>
-                    <div class="kpi-valor" id="kpi-ticket">—</div>
-                </div>
-                <div class="kpi-card kpi-verde">
-                    <div class="kpi-label">Tasa de Cobro</div>
-                    <div class="kpi-valor" id="kpi-tasa">—</div>
-                </div>
-                <div class="kpi-card" id="kpi-balance-card">
-                    <div class="kpi-label">Balance Neto</div>
-                    <div class="kpi-valor" id="kpi-balance">—</div>
-                    <div class="kpi-sub" id="kpi-gastos-sub">—</div>
-                </div>
+            <!-- Sub-tabs -->
+            <div class="dash-subtabs">
+                <button class="dash-subtab-btn active" onclick="cambiarSubtabDash('general', this)">General</button>
+                <button class="dash-subtab-btn" onclick="cambiarSubtabDash('clientes', this)">Clientes</button>
+                <button class="dash-subtab-btn" onclick="cambiarSubtabDash('cobros', this)">Cobros</button>
             </div>
 
-            <!-- Fila 2: operativos -->
-            <div class="kpi-seccion">Operaciones</div>
-            <div class="kpi-grid kpi-3">
-                <div class="kpi-card">
-                    <div class="kpi-label">N° Atenciones</div>
-                    <div class="kpi-valor" id="kpi-atenciones">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Clientes Únicos</div>
-                    <div class="kpi-valor" id="kpi-clientes">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Promociones Dadas</div>
-                    <div class="kpi-valor" id="kpi-promos">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Tratamientos</div>
-                    <div class="kpi-valor" id="kpi-trat">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Productos</div>
-                    <div class="kpi-valor" id="kpi-prod">—</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Total Gastos</div>
-                    <div class="kpi-valor kpi-rojo-txt" id="kpi-gastos">—</div>
-                </div>
-            </div>
+            <!-- ─── PANEL: GENERAL ─────────────────────────────────── -->
+            <div id="dash-panel-general" class="dash-panel">
 
-            <!-- Ventas por mes (cobrado vs pendiente) -->
-            <div class="chart-card">
-                <div class="chart-titulo">Ventas por mes — cobrado vs pendiente</div>
-                <canvas id="chart-meses" height="200"></canvas>
-            </div>
+                <div class="kpi-seccion">Financiero</div>
+                <div class="kpi-grid kpi-3">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Total Facturado</div>
+                        <div class="kpi-valor" id="kpi-total">—</div>
+                    </div>
+                    <div class="kpi-card kpi-verde">
+                        <div class="kpi-label">Total Cobrado</div>
+                        <div class="kpi-valor" id="kpi-cobrado">—</div>
+                    </div>
+                    <div class="kpi-card kpi-rojo">
+                        <div class="kpi-label">Por Cobrar</div>
+                        <div class="kpi-valor" id="kpi-pendiente">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Ticket Promedio</div>
+                        <div class="kpi-valor" id="kpi-ticket">—</div>
+                    </div>
+                    <div class="kpi-card kpi-verde">
+                        <div class="kpi-label">Tasa de Cobro</div>
+                        <div class="kpi-valor" id="kpi-tasa">—</div>
+                    </div>
+                    <div class="kpi-card" id="kpi-balance-card">
+                        <div class="kpi-label">Balance Neto</div>
+                        <div class="kpi-valor" id="kpi-balance">—</div>
+                        <div class="kpi-sub" id="kpi-gastos-sub">—</div>
+                    </div>
+                </div>
 
-            <!-- Métodos de pago + Mix tratamiento/producto -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                <div class="chart-card" style="margin:0">
-                    <div class="chart-titulo">Métodos de pago</div>
+                <div class="kpi-seccion">Operaciones</div>
+                <div class="kpi-grid kpi-3">
+                    <div class="kpi-card">
+                        <div class="kpi-label">N° Atenciones</div>
+                        <div class="kpi-valor" id="kpi-atenciones">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Clientes Únicos</div>
+                        <div class="kpi-valor" id="kpi-clientes">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Promociones</div>
+                        <div class="kpi-valor" id="kpi-promos">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Tratamientos</div>
+                        <div class="kpi-valor" id="kpi-trat">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Productos</div>
+                        <div class="kpi-valor" id="kpi-prod">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Total Gastos</div>
+                        <div class="kpi-valor kpi-rojo-txt" id="kpi-gastos">—</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Ventas por mes — cobrado vs pendiente</div>
+                    <canvas id="chart-meses" height="200"></canvas>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Mix de ventas (Tratamientos / Productos)</div>
+                    <canvas id="chart-mix" height="180"></canvas>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Atenciones recientes</div>
+                    <div id="tabla-recientes"></div>
+                </div>
+
+            </div><!-- /panel-general -->
+
+            <!-- ─── PANEL: CLIENTES ───────────────────────────────── -->
+            <div id="dash-panel-clientes" class="dash-panel" style="display:none;">
+
+                <div class="kpi-seccion">Top clientes</div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Top 10 clientes por facturación</div>
+                    <canvas id="chart-clientes" height="280"></canvas>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Detalle top clientes</div>
+                    <div id="tabla-top-clientes"></div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Top 10 categorías / tratamientos</div>
+                    <canvas id="chart-cats" height="280"></canvas>
+                </div>
+
+            </div><!-- /panel-clientes -->
+
+            <!-- ─── PANEL: COBROS ─────────────────────────────────── -->
+            <div id="dash-panel-cobros" class="dash-panel" style="display:none;">
+
+                <div class="kpi-seccion">Resumen de cobros</div>
+                <div class="kpi-grid kpi-2">
+                    <div class="kpi-card kpi-verde">
+                        <div class="kpi-label">Total Cobrado</div>
+                        <div class="kpi-valor" id="kpi-cobros-total">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">N° Cobros</div>
+                        <div class="kpi-valor" id="kpi-cobros-count">—</div>
+                    </div>
+                </div>
+
+                <div class="kpi-seccion">Métodos de cobro recibidos</div>
+                <div class="kpi-grid kpi-2">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Efectivo</div>
+                        <div class="kpi-valor" id="kpi-cob-ef">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Yape</div>
+                        <div class="kpi-valor" id="kpi-cob-yp">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Plin</div>
+                        <div class="kpi-valor" id="kpi-cob-pl">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Giro</div>
+                        <div class="kpi-valor" id="kpi-cob-gi">—</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Distribución por método de cobro</div>
                     <canvas id="chart-metodos" height="200"></canvas>
                 </div>
-                <div class="chart-card" style="margin:0">
-                    <div class="chart-titulo">Mix de ventas</div>
-                    <canvas id="chart-mix" height="200"></canvas>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Cobros recientes</div>
+                    <div id="tabla-cobros-recientes"></div>
                 </div>
-            </div>
 
-            <!-- Top clientes -->
-            <div class="chart-card">
-                <div class="chart-titulo">Top 10 clientes por facturación</div>
-                <canvas id="chart-clientes" height="280"></canvas>
-            </div>
-
-            <!-- Top tratamientos -->
-            <div class="chart-card">
-                <div class="chart-titulo">Top 10 tratamientos / categorías</div>
-                <canvas id="chart-cats" height="280"></canvas>
-            </div>
-
-            <!-- Ventas recientes -->
-            <div class="chart-card">
-                <div class="chart-titulo">Atenciones recientes</div>
-                <div id="tabla-recientes"></div>
-            </div>
+            </div><!-- /panel-cobros -->
 
         </div><!-- /dash-contenido -->
     </div>
@@ -645,8 +703,23 @@
         text-transform: uppercase; letter-spacing: 1px;
         margin: 14px 0 6px;
     }
+    .dash-subtabs {
+        display: flex; gap: 4px; margin-bottom: 14px;
+        border-bottom: 2px solid #eee; padding-bottom: 0;
+    }
+    .dash-subtab-btn {
+        padding: 8px 16px; border: none; background: none;
+        font-size: 12px; font-weight: bold; color: #999;
+        cursor: pointer; border-bottom: 3px solid transparent;
+        margin-bottom: -2px; transition: all 0.2s; text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .dash-subtab-btn.active { color: #C0392B; border-bottom-color: #C0392B; }
+    .dash-subtab-btn:hover:not(.active) { color: #666; }
+    .dash-panel { }
     .kpi-grid { display: grid; gap: 8px; margin-bottom: 4px; }
     .kpi-3    { grid-template-columns: 1fr 1fr 1fr; }
+    .kpi-2    { grid-template-columns: 1fr 1fr; }
     .kpi-card {
         background: #f9f9f9; border: 1px solid #eee;
         border-radius: 10px; padding: 10px 6px; text-align: center;
@@ -1126,13 +1199,15 @@ function buscarCliente() {
                 wrapV.innerHTML = '<p class="sin-datos">Sin ventas registradas.</p>';
             } else {
                 let html = '<table class="tabla-cliente"><thead><tr>' +
-                    '<th>Fecha</th><th>Categoría</th><th>Total</th><th>Debe</th>' +
+                    '<th>Fecha</th><th>Código</th><th>Categoría</th><th>Total</th><th>Debe</th>' +
                     '</tr></thead><tbody>';
                 data.ventas.forEach(v => {
+                    const totalVal = v['TOTAL S/ (PEN)'] || v['TOTAL'] || '';
                     html += `<tr>
                         <td>${v.FECHA || ''}</td>
+                        <td style="font-size:11px;color:#bbb;">${v.COD_ITEM || '—'}</td>
                         <td>${v.CATEGORIA || ''} ${v['ZONA/CANTIDAD/ENVASE'] ? '<br><small style="color:#aaa">' + v['ZONA/CANTIDAD/ENVASE'] + '</small>' : ''}</td>
-                        <td>${v.TOTAL ? 'S/ ' + v.TOTAL : '—'}</td>
+                        <td>${totalVal ? 'S/ ' + totalVal : '—'}</td>
                         <td style="color:${v.DEBE && v.DEBE !== '0' ? '#C0392B' : 'inherit'}">${v.DEBE && v.DEBE !== '0' ? 'S/ ' + v.DEBE : '—'}</td>
                     </tr>`;
                 });
@@ -1146,15 +1221,22 @@ function buscarCliente() {
                 wrapC.innerHTML = '<p class="sin-datos">Sin cobros registrados.</p>';
             } else {
                 let html = '<table class="tabla-cliente"><thead><tr>' +
-                    '<th>Fecha</th><th>Tratamiento / Producto</th><th>Monto</th>' +
+                    '<th>Fecha</th><th>Tratamiento / Producto</th><th>Monto</th><th>Método</th>' +
                     '</tr></thead><tbody>';
                 data.cobros.forEach(c => {
                     const concepto = c.CATEGORIA || c.NOTAS || '—';
                     const codItem  = c.COD_ITEM  ? `<br><small style="color:#bbb;">${c.COD_ITEM}</small>` : '';
+                    const metodos  = [];
+                    if (parseFloat(c.EFECTIVO) > 0) metodos.push('Efectivo');
+                    if (parseFloat(c.YAPE)     > 0) metodos.push('Yape');
+                    if (parseFloat(c.PLIN)     > 0) metodos.push('Plin');
+                    if (parseFloat(c.GIRO)     > 0) metodos.push('Giro');
+                    const metodo   = metodos.join(' + ') || '—';
                     html += `<tr>
                         <td>${c.FECHA || ''}</td>
                         <td>${concepto}${codItem}</td>
                         <td style="white-space:nowrap;">S/ ${c.MONTO || '0'}</td>
+                        <td style="font-size:11px;color:#555;">${metodo}</td>
                     </tr>`;
                 });
                 html += '</tbody></table>';
@@ -1197,6 +1279,13 @@ function setPeriodo(p, btn) {
     cargarDashboard();
 }
 
+function cambiarSubtabDash(subtab, btn) {
+    document.querySelectorAll('.dash-panel').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.dash-subtab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('dash-panel-' + subtab).style.display = 'block';
+    btn.classList.add('active');
+}
+
 function cargarDashboard() {
     const desde = document.getElementById('dash-desde').value;
     const hasta = document.getElementById('dash-hasta').value;
@@ -1211,9 +1300,13 @@ function cargarDashboard() {
 
     fetch(url).then(r => r.json()).then(d => {
         document.getElementById('dash-loading').style.display = 'none';
-        if (d.sin_datos) { document.getElementById('dash-loading').textContent='Sin datos para este período.'; document.getElementById('dash-loading').style.display='block'; return; }
+        if (d.sin_datos) {
+            document.getElementById('dash-loading').textContent = 'Sin datos para este período.';
+            document.getElementById('dash-loading').style.display = 'block';
+            return;
+        }
 
-        // KPIs financieros
+        // ── GENERAL: KPIs financieros ──
         document.getElementById('kpi-total').textContent     = fmt(d.ventas_total);
         document.getElementById('kpi-cobrado').textContent   = fmt(d.cobrado_total);
         document.getElementById('kpi-pendiente').textContent = fmt(d.pendiente_total);
@@ -1226,7 +1319,7 @@ function cargarDashboard() {
         balCard.classList.add(d.balance_neto >= 0 ? 'kpi-verde' : 'kpi-rojo');
         document.getElementById('kpi-gastos-sub').textContent = 'Gastos: ' + fmt(d.total_gastos);
 
-        // KPIs operativos
+        // ── GENERAL: KPIs operativos ──
         document.getElementById('kpi-atenciones').textContent = d.num_atenciones;
         document.getElementById('kpi-clientes').textContent   = d.num_clientes;
         document.getElementById('kpi-promos').textContent     = d.num_promociones;
@@ -1234,7 +1327,7 @@ function cargarDashboard() {
         document.getElementById('kpi-prod').textContent       = fmt(d.total_productos);
         document.getElementById('kpi-gastos').textContent     = fmt(d.total_gastos);
 
-        // Chart: ventas por mes (stacked)
+        // ── GENERAL: ventas por mes (stacked) ──
         destroyChart('meses');
         charts['meses'] = new Chart(document.getElementById('chart-meses'), {
             type: 'bar',
@@ -1245,16 +1338,7 @@ function cargarDashboard() {
             options: { plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}} }
         });
 
-        // Chart: métodos de pago (donut)
-        destroyChart('metodos');
-        const metV=[d.ef_efectivo,d.ef_yape,d.ef_plin,d.ef_giro], metL=['Efectivo','Yape','Plin','Giro'];
-        charts['metodos'] = new Chart(document.getElementById('chart-metodos'), {
-            type: 'doughnut',
-            data: { labels: metL.filter((_,i)=>metV[i]>0), datasets:[{ data:metV.filter(v=>v>0), backgroundColor:COLORES, hoverOffset:6 }]},
-            options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
-        });
-
-        // Chart: mix tratamientos/productos (donut)
+        // ── GENERAL: mix tratamientos/productos ──
         destroyChart('mix');
         const mixL=['Tratamientos','Productos','Otros'], mixV=[d.total_tratamientos,d.total_productos,d.total_otros];
         charts['mix'] = new Chart(document.getElementById('chart-mix'), {
@@ -1263,7 +1347,14 @@ function cargarDashboard() {
             options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
         });
 
-        // Chart: top clientes
+        // ── GENERAL: atenciones recientes ──
+        let htmlR='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Total</th><th>Debe</th></tr></thead><tbody>';
+        d.recientes.forEach(r => {
+            htmlR+=`<tr><td>${r.fecha}</td><td>${r.cliente}</td><td>${r.categoria}</td><td>${r.total?fmt(r.total):'—'}</td><td>${r.debe>0?'<span class="debe-badge">'+fmt(r.debe)+'</span>':'—'}</td></tr>`;
+        });
+        document.getElementById('tabla-recientes').innerHTML = htmlR + '</tbody></table>';
+
+        // ── CLIENTES: top clientes chart ──
         destroyChart('clientes');
         charts['clientes'] = new Chart(document.getElementById('chart-clientes'), {
             type:'bar',
@@ -1271,7 +1362,14 @@ function cargarDashboard() {
             options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Visitas: '+d.top_clientes[ctx.dataIndex].visitas}}}, scales:{x:{beginAtZero:true}} }
         });
 
-        // Chart: top categorías
+        // ── CLIENTES: tabla top clientes ──
+        let htmlTC='<table class="tabla-rec"><thead><tr><th>#</th><th>Cliente</th><th>Visitas</th><th>Facturado</th></tr></thead><tbody>';
+        d.top_clientes.forEach((c,i) => {
+            htmlTC+=`<tr><td style="color:#aaa;font-size:11px;">${i+1}</td><td>${c.cliente}</td><td style="text-align:center;">${c.visitas}</td><td>${fmt(c.total)}</td></tr>`;
+        });
+        document.getElementById('tabla-top-clientes').innerHTML = htmlTC + '</tbody></table>';
+
+        // ── CLIENTES: top categorías ──
         destroyChart('cats');
         charts['cats'] = new Chart(document.getElementById('chart-cats'), {
             type:'bar',
@@ -1279,12 +1377,40 @@ function cargarDashboard() {
             options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Veces: '+d.por_categoria[ctx.dataIndex].count}}}, scales:{x:{beginAtZero:true}} }
         });
 
-        // Tabla recientes
-        let html='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Total</th><th>Debe</th></tr></thead><tbody>';
-        d.recientes.forEach(r => {
-            html+=`<tr><td>${r.fecha}</td><td>${r.cliente}</td><td>${r.categoria}</td><td>${r.total?fmt(r.total):'—'}</td><td>${r.debe>0?'<span class="debe-badge">'+fmt(r.debe)+'</span>':'—'}</td></tr>`;
+        // ── COBROS: KPIs ──
+        const cobrosTotal = d.cobros_ef_efectivo + d.cobros_ef_yape + d.cobros_ef_plin + d.cobros_ef_giro;
+        document.getElementById('kpi-cobros-total').textContent  = fmt(cobrosTotal);
+        document.getElementById('kpi-cobros-count').textContent  = d.cobros_recientes.length + (d.cobros_recientes.length === 10 ? '+' : '');
+        document.getElementById('kpi-cob-ef').textContent = fmt(d.cobros_ef_efectivo);
+        document.getElementById('kpi-cob-yp').textContent = fmt(d.cobros_ef_yape);
+        document.getElementById('kpi-cob-pl').textContent = fmt(d.cobros_ef_plin);
+        document.getElementById('kpi-cob-gi').textContent = fmt(d.cobros_ef_giro);
+
+        // ── COBROS: métodos donut ──
+        destroyChart('metodos');
+        const metV=[d.cobros_ef_efectivo,d.cobros_ef_yape,d.cobros_ef_plin,d.cobros_ef_giro], metL=['Efectivo','Yape','Plin','Giro'];
+        charts['metodos'] = new Chart(document.getElementById('chart-metodos'), {
+            type: 'doughnut',
+            data: { labels: metL.filter((_,i)=>metV[i]>0), datasets:[{ data:metV.filter(v=>v>0), backgroundColor:COLORES, hoverOffset:6 }]},
+            options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
         });
-        document.getElementById('tabla-recientes').innerHTML = html + '</tbody></table>';
+
+        // ── COBROS: tabla cobros recientes ──
+        let htmlCR='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Monto</th><th>Método</th></tr></thead><tbody>';
+        if (d.cobros_recientes.length === 0) {
+            htmlCR += '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px;">Sin cobros en este período</td></tr>';
+        } else {
+            d.cobros_recientes.forEach(c => {
+                htmlCR+=`<tr>
+                    <td>${c.fecha}</td>
+                    <td>${c.cliente}</td>
+                    <td>${c.categoria || '—'}${c.cod_item ? '<br><small style="color:#bbb">'+c.cod_item+'</small>' : ''}</td>
+                    <td>${fmt(c.monto)}</td>
+                    <td style="font-size:11px;">${c.metodo}</td>
+                </tr>`;
+            });
+        }
+        document.getElementById('tabla-cobros-recientes').innerHTML = htmlCR + '</tbody></table>';
 
         document.getElementById('dash-contenido').style.display = 'block';
         dashCargado = true;
