@@ -22,7 +22,8 @@ ENCABEZADOS_GASTOS = [
 ]
 
 ENCABEZADOS_COBROS = [
-    "#", "FECHA", "COD_CLIENTE", "CLIENTE", "MONTO", "EFECTIVO", "YAPE", "PLIN", "GIRO", "NOTAS"
+    "#", "FECHA", "COD_CLIENTE", "CLIENTE", "MONTO", "EFECTIVO", "YAPE", "PLIN", "GIRO", "NOTAS",
+    "COD_ITEM", "CATEGORIA"
 ]
 
 ENCABEZADOS_CLIENTES = [
@@ -44,11 +45,21 @@ def get_gspread_client():
         )
     return gspread.authorize(creds)
 
+def ensure_headers(ws, encabezados):
+    """Actualiza la fila de encabezados si faltan columnas nuevas."""
+    try:
+        current = ws.row_values(1)
+        if current[:len(encabezados)] != encabezados:
+            ws.update('A1', [encabezados])
+    except Exception:
+        pass
+
 def get_or_create_worksheet(spreadsheet, nombre, encabezados):
     try:
         ws = spreadsheet.worksheet(nombre)
+        ensure_headers(ws, encabezados)
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(title=nombre, rows=2000, cols=len(encabezados))
+        ws = spreadsheet.add_worksheet(title=nombre, rows=2000, cols=max(len(encabezados), 20))
         ws.append_row(encabezados)
     return ws
 
@@ -122,6 +133,7 @@ def index():
     active_tab = request.args.get("tab", "venta")
     clientes = []
     clientes_codigos = {}
+    clientes_data = {}
     next_client_num = 1
     try:
         ventas, _, _, clientes_ws = get_sheets()
@@ -129,12 +141,20 @@ def index():
         todos_c = clientes_ws.get_all_values()
         for fila in todos_c[1:]:
             if len(fila) > 1 and fila[1].strip():
-                clientes_codigos[fila[1].strip().lower()] = fila[0]
+                key = fila[1].strip().lower()
+                clientes_codigos[key] = fila[0]
+                clientes_data[key] = {
+                    "codigo":    fila[0] if len(fila) > 0 else "",
+                    "telefono":  fila[2] if len(fila) > 2 else "",
+                    "cumpleanos": fila[3] if len(fila) > 3 else "",
+                    "email":     fila[5] if len(fila) > 5 else "",
+                }
         next_client_num = len([r for r in todos_c[1:] if any(r)]) + 1
     except Exception:
         pass
     return render_template("formulario.html", clientes=clientes, active_tab=active_tab,
-                           clientes_codigos=clientes_codigos, next_client_num=next_client_num)
+                           clientes_codigos=clientes_codigos, clientes_data=clientes_data,
+                           next_client_num=next_client_num)
 
 # ── Guardar Venta ─────────────────────────────────────────────────────────────
 
@@ -168,30 +188,25 @@ def guardar_venta():
         total_pagado_hoy = to_float(efectivo) + to_float(yape) + to_float(plin) + to_float(giro)
 
         num_items = int(request.form.get("num_items", 1))
-        filas_guardadas = 0
         total_contratado = 0.0
 
+        # ── Fase 1: preparar todos los ítems con sus códigos ──────────────────
+        items_prep = []
         for i in range(num_items):
             tipo = request.form.get(f"tipo_{i}", "")
             if not tipo:
                 continue
-
             categoria = request.form.get(f"categoria_{i}", "")
             if categoria == "__otro__":
                 categoria = request.form.get(f"categoria_otro_{i}", "")
-
             zona         = request.form.get(f"zona_{i}", "")
             moneda_item  = request.form.get(f"moneda_item_{i}", "Soles")
             tc_item      = request.form.get(f"tc_item_{i}", "") or ""
-            # total_item_i es el precio en Soles (calculado por JS)
-            precio_soles = request.form.get(f"total_item_{i}", "0") or "0"
-            pago_item    = request.form.get(f"pago_item_{i}", "0") or "0"
-            precio_f     = to_float(precio_soles)
-            pago_f       = to_float(pago_item)
-            debe_item    = max(0.0, precio_f - pago_f)
-            total_contratado += precio_f
+            precio_soles = to_float(request.form.get(f"total_item_{i}", "0") or "0")
+            pago_item    = to_float(request.form.get(f"pago_item_{i}", "0") or "0")
+            debe_item    = max(0.0, precio_soles - pago_item)
+            total_contratado += precio_soles
 
-            # Código de ítem según tipo
             if tipo in ("Tratamiento", "Certificado"):
                 cod_item = get_next_item_code(ventas, "Tratamiento")
             elif tipo == "Producto":
@@ -199,38 +214,57 @@ def guardar_venta():
             else:
                 cod_item = ""
 
-            # Métodos de pago solo en la primera fila
-            ef = efectivo if filas_guardadas == 0 else ""
-            ya = yape     if filas_guardadas == 0 else ""
-            pl = plin     if filas_guardadas == 0 else ""
-            gi = giro     if filas_guardadas == 0 else ""
+            items_prep.append({
+                "tipo": tipo, "categoria": categoria, "zona": zona,
+                "moneda": moneda_item, "tc": tc_item,
+                "precio": precio_soles, "pago": pago_item, "debe": debe_item,
+                "cod_item": cod_item,
+            })
 
+        # ── Fase 2: guardar en Ventas ─────────────────────────────────────────
+        for idx, item in enumerate(items_prep):
+            ef = efectivo if idx == 0 else ""
+            ya = yape     if idx == 0 else ""
+            pl = plin     if idx == 0 else ""
+            gi = giro     if idx == 0 else ""
             num = siguiente_numero(ventas)
-            datos = [num, fecha, cod_cliente, cliente, telefono, tipo, cod_item,
-                     categoria, zona, "", cumpleanos, moneda_item, precio_soles,
-                     ef, ya, pl, gi,
-                     round(debe_item) if debe_item else "",
-                     round(pago_f)    if pago_f    else "",
-                     tc_item]
-            ventas.append_row(datos)
-            filas_guardadas += 1
-
-        # Registrar pago en Cobros si pagó algo hoy
-        if filas_guardadas > 0 and total_pagado_hoy > 0:
-            _, _, cobros, _ = get_sheets()
-            num_cobro = siguiente_numero(cobros)
-            cobros.append_row([
-                num_cobro, fecha, cod_cliente, cliente,
-                round(total_pagado_hoy, 2),
-                efectivo, yape, plin, giro,
-                f"Pago en venta del {fecha}"
+            ventas.append_row([
+                num, fecha, cod_cliente, cliente, telefono,
+                item["tipo"], item["cod_item"], item["categoria"], item["zona"],
+                "", cumpleanos, item["moneda"], round(item["precio"]) if item["precio"] else "",
+                ef, ya, pl, gi,
+                round(item["debe"]) if item["debe"] else "",
+                round(item["pago"]) if item["pago"] else "",
+                item["tc"]
             ])
 
-        if filas_guardadas > 0:
-            saldo_total = round(total_contratado - total_pagado_hoy, 2)
-            msg = f"Venta guardada ({filas_guardadas} ítem(s)) — Cliente: {cod_cliente}"
-            if saldo_total > 0:
-                msg += f" — Saldo pendiente: {moneda} {saldo_total}"
+        # ── Fase 3: registrar en Cobros (uno por ítem pagado, relacional) ─────
+        if total_pagado_hoy > 0:
+            _, _, cobros, _ = get_sheets()
+            cobros_idx = 0
+            for item in items_prep:
+                if item["pago"] <= 0:
+                    continue
+                # Métodos de pago solo en el primer cobro de esta venta
+                ef_c = efectivo if cobros_idx == 0 else ""
+                ya_c = yape     if cobros_idx == 0 else ""
+                pl_c = plin     if cobros_idx == 0 else ""
+                gi_c = giro     if cobros_idx == 0 else ""
+                num_cobro = siguiente_numero(cobros)
+                cobros.append_row([
+                    num_cobro, fecha, cod_cliente, cliente,
+                    round(item["pago"]),
+                    ef_c, ya_c, pl_c, gi_c,
+                    f"Pago venta {fecha}",
+                    item["cod_item"], item["categoria"]
+                ])
+                cobros_idx += 1
+
+        if items_prep:
+            saldo = round(total_contratado - total_pagado_hoy)
+            msg = f"Venta guardada ({len(items_prep)} ítem(s)) — Cliente: {cod_cliente}"
+            if saldo > 0:
+                msg += f" — Saldo pendiente: S/ {saldo}"
             flash(msg)
         else:
             flash("No se ingresó ningún servicio.")

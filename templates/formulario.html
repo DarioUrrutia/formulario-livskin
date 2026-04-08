@@ -248,16 +248,16 @@
             <div class="fila-dos">
                 <div class="field">
                     <label>Teléfono</label>
-                    <input type="tel" name="telefono" placeholder="Número">
+                    <input type="tel" name="telefono" id="input-telefono-venta" placeholder="Número">
                 </div>
                 <div class="field">
                     <label>Email</label>
-                    <input type="email" name="email" placeholder="correo@ejemplo.com">
+                    <input type="email" name="email" id="input-email-venta" placeholder="correo@ejemplo.com">
                 </div>
             </div>
             <div class="field">
-                <label>Cumpleaños</label>
-                <input type="date" name="cumpleanos">
+                <label>Fecha de Nacimiento</label>
+                <input type="date" name="cumpleanos" id="input-cumpleanos-venta">
             </div>
 
             <div class="seccion">Servicios / Productos</div>
@@ -686,6 +686,7 @@ function cambiarTab(tab) {
 let itemCount = 0;
 
 const CLIENTES_CODIGOS = {{ clientes_codigos | tojson }};
+const CLIENTES_DATA    = {{ clientes_data    | tojson }};
 const NEXT_CLIENT_NUM  = {{ next_client_num }};
 
 const CATEGORIAS_POR_TIPO = {
@@ -725,17 +726,34 @@ function actualizarCategorias(tipoSelect, idx) {
     if (otroWrap) otroWrap.style.display = 'none';
 }
 
+function parseToInputDate(val) {
+    if (!val) return '';
+    // DD/MM/YYYY → YYYY-MM-DD
+    const p = val.split('/');
+    if (p.length === 3 && p[2].length === 4) {
+        return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    }
+    return val; // ya está en YYYY-MM-DD u otro formato
+}
+
 function actualizarCodigoCliente() {
     const nombre = document.getElementById('input-cliente-venta').value.trim();
     const badge  = document.getElementById('cod-cliente-badge');
     const texto  = document.getElementById('cod-cliente-texto');
     if (!nombre) { badge.style.display = 'none'; return; }
 
-    const codigo = CLIENTES_CODIGOS[nombre.toLowerCase()];
+    const data = CLIENTES_DATA[nombre.toLowerCase()];
     badge.style.display = 'block';
-    if (codigo) {
-        texto.textContent = codigo;
+    if (data) {
+        texto.textContent = data.codigo;
         texto.style.color = '#999';
+        // Autocompletar campos del cliente
+        const tel = document.getElementById('input-telefono-venta');
+        const em  = document.getElementById('input-email-venta');
+        const cum = document.getElementById('input-cumpleanos-venta');
+        if (tel && data.telefono)   tel.value = data.telefono;
+        if (em  && data.email)      em.value  = data.email;
+        if (cum && data.cumpleanos) cum.value = parseToInputDate(data.cumpleanos);
     } else {
         const numStr = String(NEXT_CLIENT_NUM).padStart(4, '0');
         texto.textContent = `Nuevo cliente — se asignará LIVCLIENT${numStr}`;
@@ -788,9 +806,9 @@ function agregarItem() {
                 <select id="moneda_item_${i}" name="moneda_item_${i}"
                         onchange="cambiarMonedaItem(${i})"
                         style="width:110px;flex-shrink:0;padding:10px 6px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;background:white;">
-                    <option value="Soles">S/ Soles</option>
-                    <option value="USD">US$ Dólar</option>
-                    <option value="EUR">€ Euro</option>
+                    <option value="Soles">S/ (PEN)</option>
+                    <option value="USD">$ (USD)</option>
+                    <option value="EUR">€ (EUR)</option>
                 </select>
                 <input type="number" name="precio_orig_${i}" id="precio_orig_${i}"
                        placeholder="0" step="1" min="0"
@@ -833,17 +851,17 @@ function toggleOtroItem(sel, i) {
 // ── Tipo de cambio ────────────────────────────────────────────────────────────
 let tasasHoy = { USD: null, EUR: null };
 
-async function fetchTasas() {
+// Guardamos la promesa para poder esperarla si el usuario actúa rápido
+const tasasCargadas = (async () => {
     try {
         const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=PEN,EUR');
         const data = await r.json();
         tasasHoy.USD = Math.round(data.rates.PEN * 100) / 100;
         tasasHoy.EUR = Math.round((data.rates.PEN / data.rates.EUR) * 100) / 100;
-    } catch(e) { /* sin internet, el usuario lo llena manualmente */ }
-}
-fetchTasas();
+    } catch(e) { /* sin conexión, el usuario ingresa el TC manualmente */ }
+})();
 
-function cambiarMonedaItem(idx) {
+async function cambiarMonedaItem(idx) {
     const moneda  = document.getElementById(`moneda_item_${idx}`).value;
     const tcWrap  = document.getElementById(`tc-wrap-${idx}`);
     const tcLabel = document.getElementById(`tc-label-${idx}`);
@@ -854,12 +872,19 @@ function cambiarMonedaItem(idx) {
         tcWrap.style.display = 'block';
         const sym = moneda === 'USD' ? 'US$' : '€';
         tcLabel.textContent = `T.C. (S/ por 1 ${sym}):`;
+
+        // Si el TC no está todavía, esperamos la promesa de carga
+        if (!tasasHoy.USD) {
+            fuente.textContent = 'Cargando tipo de cambio...';
+            await tasasCargadas;
+        }
+
         const tc = moneda === 'USD' ? tasasHoy.USD : tasasHoy.EUR;
-        if (tc && !tcInput.value) {
+        if (tc) {
             tcInput.value = tc.toFixed(2);
-            fuente.textContent = 'Tipo de cambio del día (editable)';
-        } else if (!tc) {
-            fuente.textContent = 'Ingresa el tipo de cambio manualmente';
+            fuente.textContent = `Tipo de cambio del día — editable`;
+        } else {
+            fuente.textContent = 'No se pudo obtener — ingresa manualmente';
         }
     } else {
         tcWrap.style.display = 'none';
