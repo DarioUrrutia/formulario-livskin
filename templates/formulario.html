@@ -199,6 +199,18 @@
         .sin-datos { color: #aaa; font-size: 13px; text-align: center; padding: 20px 0; }
         #resultado-cliente { display: none; }
 
+        /* Cobro: tarjetas de ítems pendientes */
+        .cobro-item-card {
+            border: 1.5px solid #eee; border-radius: 8px; padding: 12px 14px;
+            margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+        }
+        .cobro-item-card:hover { border-color: #C0392B; background: #fdf8f8; }
+        .cobro-item-card.selected { border-color: #C0392B; background: #fdf4f4; box-shadow: 0 0 0 2px rgba(192,57,43,0.15); }
+        .cobro-item-card .ci-nombre { font-size: 13px; font-weight: bold; color: #333; }
+        .cobro-item-card .ci-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+        .cobro-item-card .ci-debe { font-size: 16px; font-weight: bold; color: #C0392B; white-space: nowrap; }
+        .cobro-item-card .ci-total { font-size: 10px; color: #aaa; }
+
         /* Historial por día */
         .dia-block { border: 1px solid #eee; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
         .dia-header { background: #f5f5f5; padding: 8px 12px; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eee; }
@@ -409,52 +421,73 @@
     <div id="tab-cobro" class="tab-content form-body">
         <form method="POST" action="/cobro">
 
-            <div class="seccion">Cobro de deuda</div>
-            <p style="font-size:13px;color:#666;margin-bottom:16px;">
-                Registrá aquí cuando un paciente viene a pagar lo que quedó debiendo.
-            </p>
+            <div class="seccion">Cliente</div>
             <div class="field">
                 <label>Cliente *</label>
-                <input type="text" name="cliente_cobro" placeholder="Nombre del paciente" required
-                       list="lista-clientes-cobro">
+                <input type="text" name="cliente_cobro" id="input-cliente-cobro" placeholder="Nombre del paciente" required
+                       list="lista-clientes-cobro" oninput="cargarDeudaCliente()">
                 <datalist id="lista-clientes-cobro">
                     {% for c in clientes %}<option value="{{ c }}">{% endfor %}
                 </datalist>
             </div>
+
+            <!-- Deuda pendiente del cliente (aparece dinámicamente) -->
+            <div id="cobro-deuda-wrap" style="display:none;">
+                <div class="seccion">Relacionar con tratamiento / producto</div>
+                <p style="font-size:12px;color:#888;margin-bottom:10px;">
+                    Selecciona el ítem al que corresponde este pago. Si es un adelanto, puedes omitir.
+                </p>
+                <div id="cobro-items-list"></div>
+
+                <!-- Badge del ítem seleccionado -->
+                <div id="cobro-item-badge" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 12px; margin-bottom:12px; display:none; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:11px;color:#856404;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Relacionado con:</div>
+                        <div id="cobro-item-label" style="font-size:13px;font-weight:bold;color:#333;margin-top:2px;"></div>
+                    </div>
+                    <button type="button" onclick="limpiarItemCobro()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">✕</button>
+                </div>
+            </div>
+
+            <!-- Campos ocultos para el ítem seleccionado -->
+            <input type="hidden" name="cod_item_cobro" id="cod_item_cobro" value="">
+            <input type="hidden" name="categoria_cobro" id="categoria_cobro" value="">
+
+            <div class="seccion">Pago</div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Fecha *</label>
                     <input type="date" name="fecha_cobro" id="fecha-cobro" required>
                 </div>
                 <div class="field">
-                    <label>Monto cobrado *</label>
-                    <input type="number" name="monto_cobro" placeholder="0.00" step="0.01" required>
+                    <label>Monto *</label>
+                    <input type="number" name="monto_cobro" id="monto-cobro" placeholder="0" step="1" min="0" required>
                 </div>
             </div>
             <div class="seccion">Forma de pago</div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Efectivo</label>
-                    <input type="number" name="efectivo_cobro" placeholder="0.00" step="0.01">
+                    <input type="number" name="efectivo_cobro" placeholder="0" step="1" min="0">
                 </div>
                 <div class="field">
                     <label>Yape</label>
-                    <input type="number" name="yape_cobro" placeholder="0.00" step="0.01">
+                    <input type="number" name="yape_cobro" placeholder="0" step="1" min="0">
                 </div>
             </div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Plin</label>
-                    <input type="number" name="plin_cobro" placeholder="0.00" step="0.01">
+                    <input type="number" name="plin_cobro" placeholder="0" step="1" min="0">
                 </div>
                 <div class="field">
                     <label>Giro</label>
-                    <input type="number" name="giro_cobro" placeholder="0.00" step="0.01">
+                    <input type="number" name="giro_cobro" placeholder="0" step="1" min="0">
                 </div>
             </div>
             <div class="field">
-                <label>Notas</label>
-                <input type="text" name="notas_cobro" placeholder="Ej: pago de deuda del 15/03">
+                <label>Notas (opcional)</label>
+                <input type="text" name="notas_cobro" placeholder="Observaciones adicionales">
             </div>
 
             <button type="submit">REGISTRAR COBRO</button>
@@ -1183,6 +1216,83 @@ function actualizarDistribucion() {
 function actualizarMonedaBadges() {} // deprecated, mantenida para compatibilidad
 
 // ── Búsqueda de cliente ───────────────────────────────────────────────────────
+// ── Tab Cobro: cargar deuda pendiente del cliente ─────────────────────────────
+let cobrosDeudaTimer = null;
+
+function cargarDeudaCliente() {
+    const nombre = document.getElementById('input-cliente-cobro').value.trim();
+    clearTimeout(cobrosDeudaTimer);
+    const wrap = document.getElementById('cobro-deuda-wrap');
+    if (!nombre) { wrap.style.display = 'none'; return; }
+
+    cobrosDeudaTimer = setTimeout(() => {
+        fetch('/cliente?nombre=' + encodeURIComponent(nombre))
+            .then(r => r.json())
+            .then(data => {
+                wrap.style.display = 'block';
+                const list = document.getElementById('cobro-items-list');
+                const pendientes = data.ventas.filter(v => parseFloat(v.DEBE || 0) > 0);
+
+                if (pendientes.length === 0) {
+                    const sinDeuda = data.facturado_total > 0
+                        ? (data.saldo < -0.5
+                            ? '<p style="color:#27ae60;font-size:13px;text-align:center;padding:10px 0;">Cliente al día — tiene saldo a favor de S/ ' + Math.abs(data.saldo).toFixed(2) + '</p>'
+                            : '<p style="color:#27ae60;font-size:13px;text-align:center;padding:10px 0;">Cliente al día, sin deuda pendiente.</p>')
+                        : '<p style="color:#aaa;font-size:13px;text-align:center;padding:10px 0;">Sin ventas registradas para este cliente.</p>';
+                    list.innerHTML = sinDeuda;
+                    return;
+                }
+
+                let html = '';
+                pendientes.forEach((v, idx) => {
+                    const debe     = parseFloat(v.DEBE || 0);
+                    const totalVal = v['TOTAL S/ (PEN)'] || v['TOTAL'] || '0';
+                    const cat      = (v.CATEGORIA || '').replace(/'/g, "\\'");
+                    const cod      = (v.COD_ITEM  || '').replace(/'/g, "\\'");
+                    html += `<div class="cobro-item-card" id="cobro-card-${idx}"
+                        onclick="seleccionarItemCobro('${cod}', '${cat}', ${debe}, ${idx})">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                            <div style="flex:1;min-width:0;">
+                                <div class="ci-nombre">${v.CATEGORIA || v.TIPO || '—'}</div>
+                                <div class="ci-meta">${v.COD_ITEM || ''} · ${v.FECHA || ''}</div>
+                            </div>
+                            <div style="text-align:right;flex-shrink:0;">
+                                <div class="ci-debe">S/ ${Math.round(debe)}</div>
+                                <div class="ci-total">de S/ ${totalVal}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                list.innerHTML = html;
+            })
+            .catch(() => {});
+    }, 500);
+}
+
+function seleccionarItemCobro(codItem, categoria, debe, idx) {
+    document.getElementById('cod_item_cobro').value  = codItem;
+    document.getElementById('categoria_cobro').value = categoria;
+    // Pre-llenar monto con la deuda
+    const montoEl = document.getElementById('monto-cobro');
+    if (montoEl) montoEl.value = Math.round(debe);
+    // Badge de seleccionado
+    const badge = document.getElementById('cobro-item-badge');
+    badge.style.display = 'flex';
+    document.getElementById('cobro-item-label').textContent =
+        categoria + (codItem ? ' — ' + codItem : '');
+    // Resaltar tarjeta
+    document.querySelectorAll('.cobro-item-card').forEach(c => c.classList.remove('selected'));
+    const card = document.getElementById('cobro-card-' + idx);
+    if (card) card.classList.add('selected');
+}
+
+function limpiarItemCobro() {
+    document.getElementById('cod_item_cobro').value  = '';
+    document.getElementById('categoria_cobro').value = '';
+    document.getElementById('cobro-item-badge').style.display = 'none';
+    document.querySelectorAll('.cobro-item-card').forEach(c => c.classList.remove('selected'));
+}
+
 function parseFechaStr(s) {
     if (!s) return new Date(0);
     const p = s.split('/');

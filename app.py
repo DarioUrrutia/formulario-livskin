@@ -330,6 +330,8 @@ def guardar_cobro():
             request.form.get("plin_cobro", ""),
             request.form.get("giro_cobro", ""),
             request.form.get("notas_cobro", ""),
+            request.form.get("cod_item_cobro", ""),
+            request.form.get("categoria_cobro", ""),
         ]
         cobros.append_row(datos)
         flash("Cobro registrado correctamente.")
