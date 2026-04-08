@@ -229,32 +229,35 @@
             <div class="seccion">Cliente</div>
             <div class="field">
                 <label>Nombre *</label>
-                <input type="text" name="cliente" placeholder="Nombre del paciente" required
-                       list="lista-clientes">
-                <datalist id="lista-clientes">
-                    {% for c in clientes %}<option value="{{ c }}">{% endfor %}
-                </datalist>
+                <div style="position:relative;">
+                    <input type="text" name="cliente" id="input-cliente-venta"
+                           placeholder="Nombre del paciente" required
+                           list="lista-clientes" oninput="actualizarCodigoCliente()">
+                    <datalist id="lista-clientes">
+                        {% for c in clientes %}<option value="{{ c }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div id="cod-cliente-badge" style="display:none; margin-top:4px; font-size:11px; color:#aaa; letter-spacing:0.3px; padding-left:2px;">
+                    <span id="cod-cliente-texto"></span>
+                </div>
+            </div>
+            <div class="field">
+                <label>Fecha *</label>
+                <input type="date" name="fecha" id="fecha-venta" required>
             </div>
             <div class="fila-dos">
-                <div class="field">
-                    <label>Fecha *</label>
-                    <input type="date" name="fecha" id="fecha-venta" required>
-                </div>
                 <div class="field">
                     <label>Teléfono</label>
                     <input type="tel" name="telefono" placeholder="Número">
                 </div>
+                <div class="field">
+                    <label>Email</label>
+                    <input type="email" name="email" placeholder="correo@ejemplo.com">
+                </div>
             </div>
-
-            <div class="fila-dos">
-                <div class="field">
-                    <label>Próxima Cita</label>
-                    <input type="date" name="proxima_cita">
-                </div>
-                <div class="field">
-                    <label>Cumpleaños</label>
-                    <input type="date" name="cumpleanos">
-                </div>
+            <div class="field">
+                <label>Cumpleaños</label>
+                <input type="date" name="cumpleanos">
             </div>
 
             <div class="seccion">Servicios / Productos</div>
@@ -273,9 +276,6 @@
 
             <div id="venta-pago">
                 <div class="seccion">Pago</div>
-                <div id="aviso-promo" class="badge-info" style="display:none;">
-                    Promoción — se registra sin cobro
-                </div>
                 <div id="venta-pago-campos">
                     <div class="fila-dos">
                         <div class="field">
@@ -664,43 +664,63 @@ function cambiarTab(tab) {
 // ── Items dinámicos ───────────────────────────────────────────────────────────
 let itemCount = 0;
 
-const CATEGORIAS_HTML = `
-    <option value="">— Seleccionar —</option>
-    <optgroup label="Tratamientos">
-        <option>Botox</option>
-        <option>Ácido Hialurónico</option>
-        <option>PRP</option>
-        <option>Hilos</option>
-        <option>Limpieza Facial</option>
-        <option>Exosoma / Vtech</option>
-        <option>Esperma de Salmón</option>
-        <option>Vitamina C / Cóctel de vida</option>
-        <option>Ozono</option>
-        <option>Autohemoterapia</option>
-        <option>Infiltración</option>
-        <option>Bioestimuladores</option>
-        <option>Rinomodelación con Ac. Hialurónico</option>
-        <option>Bléfaroplastia</option>
-        <option>Cauterización</option>
-        <option>Lifting Facial</option>
-        <option>Microblending</option>
-        <option>Pigmentación de Labios</option>
-        <option>Retiro de Lipoma</option>
-        <option>Subcisión con PRP</option>
-        <option>Certificado Médico</option>
-    </optgroup>
-    <optgroup label="Productos">
-        <option>Bloqueador</option>
-        <option>Hidratante Forte</option>
-        <option>Jabón</option>
-        <option>Shampoo</option>
-        <option>Loción</option>
-        <option>Exfoliante</option>
-        <option>Mascarilla</option>
-        <option>Vitamina C Sérum</option>
-    </optgroup>
-    <option value="__otro__">Otro (escribir)</option>
-`;
+const CLIENTES_CODIGOS = {{ clientes_codigos | tojson }};
+const NEXT_CLIENT_NUM  = {{ next_client_num }};
+
+const CATEGORIAS_POR_TIPO = {
+    'Tratamiento': [
+        'Botox', 'Ácido Hialurónico', 'PRP', 'Hilos', 'Limpieza Facial',
+        'Exosoma / Vtech', 'Esperma de Salmón', 'Vitamina C / Cóctel de vida',
+        'Ozono', 'Autohemoterapia', 'Infiltración', 'Bioestimuladores',
+        'Rinomodelación con Ac. Hialurónico', 'Bléfaroplastia', 'Cauterización',
+        'Lifting Facial', 'Microblending', 'Pigmentación de Labios',
+        'Retiro de Lipoma', 'Subcisión con PRP'
+    ],
+    'Producto': [
+        'Bloqueador', 'Hidratante Forte', 'Jabón', 'Shampoo',
+        'Loción', 'Exfoliante', 'Mascarilla', 'Vitamina C Sérum'
+    ],
+    'Certificado': ['Certificado Médico'],
+    'Otros': []
+};
+
+function actualizarCategorias(tipoSelect, idx) {
+    const tipo = tipoSelect.value;
+    const catSelect = document.querySelector(`[name="categoria_${idx}"]`);
+    const cats = CATEGORIAS_POR_TIPO[tipo] || [];
+
+    let html = '<option value="">— Seleccionar —</option>';
+    cats.forEach(c => { html += `<option value="${c}">${c}</option>`; });
+    if (tipo && tipo !== 'Certificado') {
+        html += '<option value="__otro__">Otro (escribir)</option>';
+    }
+    catSelect.innerHTML = html;
+
+    // Si solo hay una opción, seleccionarla automáticamente
+    if (cats.length === 1) catSelect.value = cats[0];
+
+    // Reset campo libre
+    const otroWrap = document.getElementById(`otro-wrap-${idx}`);
+    if (otroWrap) otroWrap.style.display = 'none';
+}
+
+function actualizarCodigoCliente() {
+    const nombre = document.getElementById('input-cliente-venta').value.trim();
+    const badge  = document.getElementById('cod-cliente-badge');
+    const texto  = document.getElementById('cod-cliente-texto');
+    if (!nombre) { badge.style.display = 'none'; return; }
+
+    const codigo = CLIENTES_CODIGOS[nombre.toLowerCase()];
+    badge.style.display = 'block';
+    if (codigo) {
+        texto.textContent = codigo;
+        texto.style.color = '#999';
+    } else {
+        const numStr = String(NEXT_CLIENT_NUM).padStart(4, '0');
+        texto.textContent = `Nuevo cliente — se asignará LIVCLIENT${numStr}`;
+        texto.style.color = '#bbb';
+    }
+}
 
 function agregarItem() {
     const i = itemCount++;
@@ -719,17 +739,19 @@ function agregarItem() {
         </div>
         <div class="field">
             <label>Tipo *</label>
-            <select name="tipo_${i}" onchange="actualizarPagoVisibility()" required>
+            <select name="tipo_${i}" onchange="actualizarCategorias(this, ${i})" required>
                 <option value="">— Seleccionar —</option>
                 <option value="Tratamiento">Tratamiento</option>
                 <option value="Producto">Producto</option>
-                <option value="Promoción">Promoción (sin cobro)</option>
+                <option value="Certificado">Certificado</option>
                 <option value="Otros">Otros</option>
             </select>
         </div>
         <div class="field">
             <label>Categoría</label>
-            <select name="categoria_${i}" onchange="toggleOtroItem(this, ${i})">${CATEGORIAS_HTML}</select>
+            <select name="categoria_${i}" onchange="toggleOtroItem(this, ${i})">
+                <option value="">— Seleccionar tipo primero —</option>
+            </select>
         </div>
         <div class="field" id="otro-wrap-${i}" style="display:none;">
             <label>Especificar</label>
@@ -740,7 +762,7 @@ function agregarItem() {
             <input type="text" name="zona_${i}" placeholder="Ej: 3 Superior, 2 und...">
         </div>
         <div class="field">
-            <label>Total de este ítem</label>
+            <label>Precio de Venta</label>
             <input type="number" name="total_item_${i}" placeholder="0.00" step="0.01"
                    oninput="calcularTotalVenta()">
         </div>
@@ -770,17 +792,8 @@ function calcularTotalVenta() {
 }
 
 function actualizarPagoVisibility() {
-    const tipos = Array.from(document.querySelectorAll('[name^="tipo_"]')).map(s => s.value);
-    const soloPromos = tipos.length > 0 && tipos.every(t => t === 'Promoción');
-    const pagoDiv = document.getElementById('venta-pago-campos');
-    const avisoPromo = document.getElementById('aviso-promo');
-    if (soloPromos) {
-        pagoDiv.style.display = 'none';
-        avisoPromo.style.display = 'block';
-    } else {
-        pagoDiv.style.display = 'block';
-        avisoPromo.style.display = 'none';
-    }
+    // Sección pago siempre visible
+    document.getElementById('venta-pago-campos').style.display = 'block';
 }
 
 // ── Lógica Venta ─────────────────────────────────────────────────────────────

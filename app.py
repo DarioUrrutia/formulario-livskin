@@ -26,7 +26,7 @@ ENCABEZADOS_COBROS = [
 ]
 
 ENCABEZADOS_CLIENTES = [
-    "COD_CLIENTE", "NOMBRE", "TELEFONO", "CUMPLEANOS", "FECHA_REGISTRO"
+    "COD_CLIENTE", "NOMBRE", "TELEFONO", "CUMPLEANOS", "FECHA_REGISTRO", "EMAIL"
 ]
 
 def get_gspread_client():
@@ -61,7 +61,7 @@ def get_sheets():
     clientes = get_or_create_worksheet(spreadsheet, "Clientes", ENCABEZADOS_CLIENTES)
     return ventas, gastos, cobros, clientes
 
-def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos=""):
+def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos="", email=""):
     """Retorna el código del cliente, creándolo si no existe."""
     todos = clientes_ws.get_all_values()
     nombre_lower = nombre.strip().lower()
@@ -71,12 +71,17 @@ def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos=""):
     # Crear nuevo cliente
     num = len([r for r in todos[1:] if any(r)]) + 1
     codigo = f"LIVCLIENT{num:04d}"
-    clientes_ws.append_row([codigo, nombre.strip(), telefono, cumpleanos, str(date.today())])
+    clientes_ws.append_row([codigo, nombre.strip(), telefono, cumpleanos, str(date.today()), email])
     return codigo
 
 def get_next_item_code(ventas_ws, tipo):
     """Genera el siguiente código LIVTRAT#### o LIVPROD####."""
-    prefix = "LIVTRAT" if tipo == "Tratamiento" else "LIVPROD"
+    if tipo in ("Tratamiento", "Certificado"):
+        prefix = "LIVTRAT"
+    elif tipo == "Producto":
+        prefix = "LIVPROD"
+    else:
+        prefix = "LIVTRAT"
     todos = ventas_ws.get_all_values()
     max_num = 0
     for fila in todos[1:]:
@@ -115,12 +120,21 @@ def obtener_clientes(sheet_ventas):
 @app.route("/", methods=["GET"])
 def index():
     active_tab = request.args.get("tab", "venta")
+    clientes = []
+    clientes_codigos = {}
+    next_client_num = 1
     try:
-        ventas, _, _, _ = get_sheets()
+        ventas, _, _, clientes_ws = get_sheets()
         clientes = obtener_clientes(ventas)
+        todos_c = clientes_ws.get_all_values()
+        for fila in todos_c[1:]:
+            if len(fila) > 1 and fila[1].strip():
+                clientes_codigos[fila[1].strip().lower()] = fila[0]
+        next_client_num = len([r for r in todos_c[1:] if any(r)]) + 1
     except Exception:
-        clientes = []
-    return render_template("formulario.html", clientes=clientes, active_tab=active_tab)
+        pass
+    return render_template("formulario.html", clientes=clientes, active_tab=active_tab,
+                           clientes_codigos=clientes_codigos, next_client_num=next_client_num)
 
 # ── Guardar Venta ─────────────────────────────────────────────────────────────
 
@@ -133,12 +147,12 @@ def guardar_venta():
         fecha      = request.form.get("fecha", "")
         cliente    = request.form.get("cliente", "")
         telefono   = request.form.get("telefono", "")
-        prox_cita  = request.form.get("proxima_cita", "")
+        email      = request.form.get("email", "")
         cumpleanos = request.form.get("cumpleanos", "")
         moneda     = request.form.get("moneda", "SOLES")
 
         # Obtener o crear código de cliente
-        cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos)
+        cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos, email)
 
         # Pago (solo en el primer ítem)
         efectivo   = request.form.get("efectivo", "")
@@ -163,7 +177,7 @@ def guardar_venta():
             total = request.form.get(f"total_item_{i}", "")
 
             # Código de ítem según tipo
-            if tipo in ("Tratamiento", "Promoción"):
+            if tipo in ("Tratamiento", "Certificado"):
                 cod_item = get_next_item_code(ventas, "Tratamiento")
             elif tipo == "Producto":
                 cod_item = get_next_item_code(ventas, "Producto")
@@ -179,7 +193,7 @@ def guardar_venta():
 
             num = siguiente_numero(ventas)
             datos = [num, fecha, cod_cliente, cliente, telefono, tipo, cod_item,
-                     categoria, zona, prox_cita, cumpleanos, moneda, total,
+                     categoria, zona, "", cumpleanos, moneda, total,
                      ef, ya, pl, gi, de]
             ventas.append_row(datos)
             filas_guardadas += 1
