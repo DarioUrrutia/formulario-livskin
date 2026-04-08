@@ -229,7 +229,7 @@
             <div class="seccion">Cliente</div>
             <div class="field">
                 <label>Fecha *</label>
-                <input type="date" name="fecha" id="fecha-venta" required>
+                <input type="date" name="fecha" id="fecha-venta" required onchange="actualizarTCPorFecha()">
             </div>
             <div class="field">
                 <label>Nombre *</label>
@@ -849,17 +849,50 @@ function toggleOtroItem(sel, i) {
 }
 
 // ── Tipo de cambio ────────────────────────────────────────────────────────────
-let tasasHoy = { USD: null, EUR: null };
+let tasasCache = {};   // { "2026-04-08": { USD: 3.72, EUR: 4.10 }, ... }
+let tcPromesa  = null; // promesa de la última carga en curso
 
-// Guardamos la promesa para poder esperarla si el usuario actúa rápido
-const tasasCargadas = (async () => {
+async function fetchTasasPorFecha(fecha) {
+    // Si ya tenemos la tasa para esta fecha, no fetchar de nuevo
+    if (tasasCache[fecha]) return;
+    // Usar 'latest' para hoy, o la fecha específica para días pasados
+    const hoy = new Date().toISOString().split('T')[0];
+    const endpoint = (!fecha || fecha === hoy) ? 'latest' : fecha;
     try {
-        const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=PEN,EUR');
+        const r = await fetch(`https://api.frankfurter.app/${endpoint}?from=USD&to=PEN,EUR`);
         const data = await r.json();
-        tasasHoy.USD = Math.round(data.rates.PEN * 100) / 100;
-        tasasHoy.EUR = Math.round((data.rates.PEN / data.rates.EUR) * 100) / 100;
-    } catch(e) { /* sin conexión, el usuario ingresa el TC manualmente */ }
-})();
+        tasasCache[fecha || hoy] = {
+            USD: Math.round(data.rates.PEN * 100) / 100,
+            EUR: Math.round((data.rates.PEN / data.rates.EUR) * 100) / 100,
+        };
+    } catch(e) { /* sin conexión — el usuario ingresa manualmente */ }
+}
+
+function getFechaVenta() {
+    return document.getElementById('fecha-venta')?.value || '';
+}
+
+// Cargar tasas con la fecha actual al iniciar
+tcPromesa = fetchTasasPorFecha(new Date().toISOString().split('T')[0]);
+
+async function actualizarTCPorFecha() {
+    const fecha = getFechaVenta();
+    if (!fecha) return;
+    await fetchTasasPorFecha(fecha);
+    // Actualizar todos los ítems que ya tengan moneda seleccionada
+    for (let i = 0; i < itemCount; i++) {
+        const monedaEl = document.getElementById(`moneda_item_${i}`);
+        if (!monedaEl || monedaEl.value === 'Soles') continue;
+        const tcInput = document.getElementById(`tc_item_${i}`);
+        const fuente  = document.getElementById(`tc-fuente-${i}`);
+        const tasas   = tasasCache[fecha];
+        if (tasas && tcInput) {
+            tcInput.value = (monedaEl.value === 'USD' ? tasas.USD : tasas.EUR).toFixed(2);
+            if (fuente) fuente.textContent = `T.C. para ${fecha} — editable`;
+            actualizarPrecioItem(i);
+        }
+    }
+}
 
 async function cambiarMonedaItem(idx) {
     const moneda  = document.getElementById(`moneda_item_${idx}`).value;
@@ -873,16 +906,16 @@ async function cambiarMonedaItem(idx) {
         const sym = moneda === 'USD' ? 'US$' : '€';
         tcLabel.textContent = `T.C. (S/ por 1 ${sym}):`;
 
-        // Si el TC no está todavía, esperamos la promesa de carga
-        if (!tasasHoy.USD) {
+        const fecha = getFechaVenta();
+        if (!tasasCache[fecha]) {
             fuente.textContent = 'Cargando tipo de cambio...';
-            await tasasCargadas;
+            await fetchTasasPorFecha(fecha);
         }
 
-        const tc = moneda === 'USD' ? tasasHoy.USD : tasasHoy.EUR;
-        if (tc) {
-            tcInput.value = tc.toFixed(2);
-            fuente.textContent = `Tipo de cambio del día — editable`;
+        const tasas = tasasCache[fecha];
+        if (tasas) {
+            tcInput.value = (moneda === 'USD' ? tasas.USD : tasas.EUR).toFixed(2);
+            fuente.textContent = `T.C. para ${fecha || 'hoy'} — editable`;
         } else {
             fuente.textContent = 'No se pudo obtener — ingresa manualmente';
         }
