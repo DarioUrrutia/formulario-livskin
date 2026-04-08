@@ -228,6 +228,10 @@
 
             <div class="seccion">Cliente</div>
             <div class="field">
+                <label>Fecha *</label>
+                <input type="date" name="fecha" id="fecha-venta" required>
+            </div>
+            <div class="field">
                 <label>Nombre *</label>
                 <div style="position:relative;">
                     <input type="text" name="cliente" id="input-cliente-venta"
@@ -240,10 +244,6 @@
                 <div id="cod-cliente-badge" style="display:none; margin-top:4px; font-size:11px; color:#aaa; letter-spacing:0.3px; padding-left:2px;">
                     <span id="cod-cliente-texto"></span>
                 </div>
-            </div>
-            <div class="field">
-                <label>Fecha *</label>
-                <input type="date" name="fecha" id="fecha-venta" required>
             </div>
             <div class="fila-dos">
                 <div class="field">
@@ -274,46 +274,68 @@
                 + Agregar servicio / producto
             </button>
 
+            <!-- ── Resumen de distribución ── -->
+            <div id="panel-resumen" style="display:none; background:#f0faf4; border:1.5px solid #b2dfdb; border-radius:10px; padding:14px; margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:bold;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Resumen de Pago</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Total Contratado</div>
+                        <div id="resumen-total" style="font-size:16px;font-weight:bold;color:#333;">S/ 0.00</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Abona Hoy</div>
+                        <div id="resumen-abona" style="font-size:16px;font-weight:bold;color:#27ae60;">S/ 0.00</div>
+                    </div>
+                </div>
+                <!-- Barra de progreso -->
+                <div style="background:#e0f2f1;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
+                    <div id="barra-progreso" style="height:100%;background:#27ae60;width:0%;transition:width 0.3s;border-radius:4px;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;">
+                    <span>Distribuido en ítems: <strong id="resumen-distribuido" style="color:#27ae60;">S/ 0.00</strong></span>
+                    <span>Por distribuir: <strong id="resumen-por-distribuir" style="color:#e67e22;">S/ 0.00</strong></span>
+                </div>
+                <div id="resumen-saldo-total" style="text-align:center;margin-top:8px;font-size:12px;color:#C0392B;display:none;">
+                    Saldo pendiente total: <strong id="resumen-saldo-val">S/ 0.00</strong>
+                </div>
+            </div>
+
             <div id="venta-pago">
                 <div class="seccion">Pago</div>
                 <div id="venta-pago-campos">
-                    <div class="fila-dos">
-                        <div class="field">
-                            <label>Moneda</label>
-                            <select name="moneda">
-                                <option value="SOLES" selected>Soles</option>
-                                <option value="DOLARES">Dólares</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Total</label>
-                            <input type="number" name="total" id="total-venta" placeholder="0.00" step="0.01">
-                        </div>
+                    <div class="field">
+                        <label>Moneda</label>
+                        <select name="moneda" onchange="actualizarMonedaBadges(this.value)">
+                            <option value="SOLES" selected>Soles (S/)</option>
+                            <option value="DOLARES">Dólares (US$)</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px;color:#888;margin-bottom:10px;">
+                        Ingresa los montos por forma de pago. El total se calcula automáticamente.
                     </div>
                     <div class="fila-dos">
                         <div class="field">
                             <label>Efectivo</label>
-                            <input type="number" name="efectivo" placeholder="0.00" step="0.01">
+                            <input type="number" name="efectivo" id="ef-efectivo" placeholder="0.00" step="0.01" oninput="actualizarDistribucion()">
                         </div>
                         <div class="field">
                             <label>Yape</label>
-                            <input type="number" name="yape" placeholder="0.00" step="0.01">
+                            <input type="number" name="yape" id="ef-yape" placeholder="0.00" step="0.01" oninput="actualizarDistribucion()">
                         </div>
                     </div>
                     <div class="fila-dos">
                         <div class="field">
                             <label>Plin</label>
-                            <input type="number" name="plin" placeholder="0.00" step="0.01">
+                            <input type="number" name="plin" id="ef-plin" placeholder="0.00" step="0.01" oninput="actualizarDistribucion()">
                         </div>
                         <div class="field">
                             <label>Giro</label>
-                            <input type="number" name="giro" placeholder="0.00" step="0.01">
+                            <input type="number" name="giro" id="ef-giro" placeholder="0.00" step="0.01" oninput="actualizarDistribucion()">
                         </div>
                     </div>
-                    <div class="field">
-                        <label>Debe (queda pendiente)</label>
-                        <input type="number" name="debe" placeholder="0.00" step="0.01">
-                    </div>
+                    <!-- Totales calculados automáticamente (ocultos, se envían al server) -->
+                    <input type="hidden" name="total" id="total-venta">
+                    <input type="hidden" name="debe" id="debe-venta">
                 </div>
             </div>
 
@@ -763,8 +785,20 @@ function agregarItem() {
         </div>
         <div class="field">
             <label>Precio de Venta</label>
-            <input type="number" name="total_item_${i}" placeholder="0.00" step="0.01"
-                   oninput="calcularTotalVenta()">
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span class="moneda-badge" style="font-size:13px;color:#888;font-weight:bold;min-width:28px;">S/</span>
+                <input type="number" name="total_item_${i}" id="precio_item_${i}" placeholder="0.00" step="0.01"
+                       oninput="calcularTotalVenta(); actualizarDistribucion()" style="flex:1;">
+            </div>
+        </div>
+        <div class="field" style="margin-top:8px; padding-top:8px; border-top:1px dashed #e0e0e0;">
+            <label style="color:#27ae60;">¿Cuánto abona hoy por este ítem?</label>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span class="moneda-badge" style="font-size:13px;color:#27ae60;font-weight:bold;min-width:28px;">S/</span>
+                <input type="number" name="pago_item_${i}" id="pago_item_${i}" placeholder="0.00" step="0.01"
+                       oninput="actualizarDistribucion()" style="flex:1; border-color:#b2dfdb;">
+            </div>
+            <div id="saldo-item-${i}" style="font-size:11px;margin-top:3px;color:#aaa;"></div>
         </div>
     `;
     container.appendChild(div);
@@ -775,6 +809,7 @@ function eliminarItem(i) {
     const el = document.getElementById('item-' + i);
     if (el) el.remove();
     calcularTotalVenta();
+    actualizarDistribucion();
 }
 
 function toggleOtroItem(sel, i) {
@@ -789,42 +824,104 @@ function calcularTotalVenta() {
     });
     const totalField = document.getElementById('total-venta');
     if (totalField) totalField.value = total > 0 ? total.toFixed(2) : '';
+    actualizarDistribucion();
 }
 
 function actualizarPagoVisibility() {
-    // Sección pago siempre visible
     document.getElementById('venta-pago-campos').style.display = 'block';
 }
 
-// ── Lógica Venta ─────────────────────────────────────────────────────────────
-function actualizarVenta() {
-    const tipo = document.getElementById('tipo-venta') ? document.getElementById('tipo-venta').value : '';
-    const pagoDiv = document.getElementById('venta-pago-campos');
-    const avisoPromo = document.getElementById('aviso-promo');
-    const totalInput = document.getElementById('total-venta');
-
-    if (tipo === 'Promoción') {
-        pagoDiv.style.display = 'none';
-        avisoPromo.style.display = 'block';
-        totalInput.value = '0';
-    } else {
-        pagoDiv.style.display = 'block';
-        avisoPromo.style.display = 'none';
-        totalInput.disabled = false;
-    }
+function getSimbolo() {
+    const monedaEl = document.querySelector('[name="moneda"]');
+    return (monedaEl && monedaEl.value === 'DOLARES') ? 'US$' : 'S/';
 }
 
-function mostrarOtroVenta(select) {
-    const campo = document.getElementById('campo-otro-venta');
-    const input = document.getElementById('categoria-otro-venta');
-    if (select.value === '__otro__') {
-        campo.style.display = 'block';
-        input.required = true;
+function actualizarDistribucion() {
+    const sim = getSimbolo();
+
+    // Total contratado (suma de precios de ítems)
+    let totalContratado = 0;
+    document.querySelectorAll('[name^="total_item_"]').forEach(inp => {
+        totalContratado += parseFloat(inp.value || 0);
+    });
+
+    // Total que paga hoy (suma de métodos de pago)
+    const pagadoHoy =
+        parseFloat(document.getElementById('ef-efectivo')?.value || 0) +
+        parseFloat(document.getElementById('ef-yape')?.value    || 0) +
+        parseFloat(document.getElementById('ef-plin')?.value    || 0) +
+        parseFloat(document.getElementById('ef-giro')?.value    || 0);
+
+    // Total distribuido en ítems
+    let distribuido = 0;
+    document.querySelectorAll('[name^="pago_item_"]').forEach(inp => {
+        distribuido += parseFloat(inp.value || 0);
+    });
+
+    const porDistribuir = pagadoHoy - distribuido;
+    const saldoTotal    = totalContratado - pagadoHoy;
+
+    // Mostrar / ocultar panel
+    const panel = document.getElementById('panel-resumen');
+    if (totalContratado > 0) panel.style.display = 'block';
+
+    // Actualizar textos del panel
+    document.getElementById('resumen-total').textContent     = `${sim} ${totalContratado.toFixed(2)}`;
+    document.getElementById('resumen-abona').textContent     = `${sim} ${pagadoHoy.toFixed(2)}`;
+    document.getElementById('resumen-distribuido').textContent   = `${sim} ${distribuido.toFixed(2)}`;
+
+    const pdEl = document.getElementById('resumen-por-distribuir');
+    pdEl.textContent = `${sim} ${Math.abs(porDistribuir).toFixed(2)}`;
+    if (porDistribuir < -0.001) {
+        pdEl.style.color = '#C0392B';   // rojo: distribuyó más de lo que pagó
+        pdEl.parentElement.querySelector('span:last-child').firstChild.textContent = 'Excede lo pagado: ';
+    } else if (porDistribuir < 0.01) {
+        pdEl.style.color = '#27ae60';   // verde: todo distribuido
+        pdEl.parentElement.querySelector('span:last-child').firstChild.textContent = 'Por distribuir: ';
     } else {
-        campo.style.display = 'none';
-        input.required = false;
-        input.value = '';
+        pdEl.style.color = '#e67e22';   // naranja: falta distribuir
+        pdEl.parentElement.querySelector('span:last-child').firstChild.textContent = 'Por distribuir: ';
     }
+
+    // Barra de progreso
+    const pct = totalContratado > 0 ? Math.min(100, (pagadoHoy / totalContratado) * 100) : 0;
+    document.getElementById('barra-progreso').style.width = pct + '%';
+
+    // Saldo pendiente total
+    const saldoDiv = document.getElementById('resumen-saldo-total');
+    if (saldoTotal > 0.001) {
+        saldoDiv.style.display = 'block';
+        document.getElementById('resumen-saldo-val').textContent = `${sim} ${saldoTotal.toFixed(2)}`;
+    } else {
+        saldoDiv.style.display = 'none';
+    }
+
+    // Actualizar saldo por ítem
+    document.querySelectorAll('[name^="total_item_"]').forEach(inp => {
+        const idx = inp.name.replace('total_item_', '');
+        const precioItem = parseFloat(inp.value || 0);
+        const pagoItem   = parseFloat(document.getElementById(`pago_item_${idx}`)?.value || 0);
+        const saldoItem  = precioItem - pagoItem;
+        const saldoEl    = document.getElementById(`saldo-item-${idx}`);
+        if (saldoEl && precioItem > 0) {
+            if (saldoItem <= 0) {
+                saldoEl.textContent = 'Pagado completamente';
+                saldoEl.style.color = '#27ae60';
+            } else if (pagoItem > 0) {
+                saldoEl.textContent = `Saldo restante: ${sim} ${saldoItem.toFixed(2)}`;
+                saldoEl.style.color = '#e67e22';
+            } else {
+                saldoEl.textContent = `Queda pendiente: ${sim} ${saldoItem.toFixed(2)}`;
+                saldoEl.style.color = '#aaa';
+            }
+        }
+    });
+
+    // Actualizar campos ocultos para el servidor
+    const totalField = document.getElementById('total-venta');
+    const debeField  = document.getElementById('debe-venta');
+    if (totalField) totalField.value = totalContratado.toFixed(2);
+    if (debeField)  debeField.value  = Math.max(0, saldoTotal).toFixed(2);
 }
 
 // ── Búsqueda de cliente ───────────────────────────────────────────────────────
@@ -885,6 +982,11 @@ function buscarCliente() {
             }
         })
         .catch(() => alert('Error al buscar. Verificá la conexión.'));
+}
+
+function actualizarMonedaBadges(moneda) {
+    const simbolo = moneda === 'DOLARES' ? 'US$' : 'S/';
+    document.querySelectorAll('.moneda-badge').forEach(el => el.textContent = simbolo);
 }
 
 // ── Inicialización ────────────────────────────────────────────────────────────

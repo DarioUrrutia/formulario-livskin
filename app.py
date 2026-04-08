@@ -14,7 +14,7 @@ SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 ENCABEZADOS_VENTAS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
     "CATEGORIA", "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "CUMPLEANOS",
-    "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE"
+    "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO"
 ]
 
 ENCABEZADOS_GASTOS = [
@@ -154,15 +154,22 @@ def guardar_venta():
         # Obtener o crear código de cliente
         cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos, email)
 
-        # Pago (solo en el primer ítem)
-        efectivo   = request.form.get("efectivo", "")
-        yape       = request.form.get("yape", "")
-        plin       = request.form.get("plin", "")
-        giro       = request.form.get("giro", "")
-        debe       = request.form.get("debe", "")
+        # Métodos de pago del día (van solo en la primera fila)
+        efectivo = request.form.get("efectivo", "")
+        yape     = request.form.get("yape", "")
+        plin     = request.form.get("plin", "")
+        giro     = request.form.get("giro", "")
+
+        # Total pagado hoy (suma de métodos)
+        def to_float(v):
+            try: return float(v) if v else 0.0
+            except: return 0.0
+
+        total_pagado_hoy = to_float(efectivo) + to_float(yape) + to_float(plin) + to_float(giro)
 
         num_items = int(request.form.get("num_items", 1))
         filas_guardadas = 0
+        total_contratado = 0.0
 
         for i in range(num_items):
             tipo = request.form.get(f"tipo_{i}", "")
@@ -173,8 +180,13 @@ def guardar_venta():
             if categoria == "__otro__":
                 categoria = request.form.get(f"categoria_otro_{i}", "")
 
-            zona  = request.form.get(f"zona_{i}", "")
-            total = request.form.get(f"total_item_{i}", "")
+            zona        = request.form.get(f"zona_{i}", "")
+            precio_item = request.form.get(f"total_item_{i}", "0") or "0"
+            pago_item   = request.form.get(f"pago_item_{i}", "0") or "0"
+            precio_f    = to_float(precio_item)
+            pago_f      = to_float(pago_item)
+            debe_item   = max(0.0, precio_f - pago_f)
+            total_contratado += precio_f
 
             # Código de ítem según tipo
             if tipo in ("Tratamiento", "Certificado"):
@@ -184,22 +196,38 @@ def guardar_venta():
             else:
                 cod_item = ""
 
-            # Pago solo en el primer ítem guardado
+            # Métodos de pago solo en la primera fila
             ef = efectivo if filas_guardadas == 0 else ""
             ya = yape     if filas_guardadas == 0 else ""
             pl = plin     if filas_guardadas == 0 else ""
             gi = giro     if filas_guardadas == 0 else ""
-            de = debe     if filas_guardadas == 0 else ""
 
             num = siguiente_numero(ventas)
             datos = [num, fecha, cod_cliente, cliente, telefono, tipo, cod_item,
-                     categoria, zona, "", cumpleanos, moneda, total,
-                     ef, ya, pl, gi, de]
+                     categoria, zona, "", cumpleanos, moneda, precio_item,
+                     ef, ya, pl, gi,
+                     round(debe_item, 2) if debe_item else "",
+                     round(pago_f, 2) if pago_f else ""]
             ventas.append_row(datos)
             filas_guardadas += 1
 
+        # Registrar pago en Cobros si pagó algo hoy
+        if filas_guardadas > 0 and total_pagado_hoy > 0:
+            _, _, cobros, _ = get_sheets()
+            num_cobro = siguiente_numero(cobros)
+            cobros.append_row([
+                num_cobro, fecha, cod_cliente, cliente,
+                round(total_pagado_hoy, 2),
+                efectivo, yape, plin, giro,
+                f"Pago en venta del {fecha}"
+            ])
+
         if filas_guardadas > 0:
-            flash(f"Venta guardada ({filas_guardadas} ítem(s)) — Cliente: {cod_cliente}")
+            saldo_total = round(total_contratado - total_pagado_hoy, 2)
+            msg = f"Venta guardada ({filas_guardadas} ítem(s)) — Cliente: {cod_cliente}"
+            if saldo_total > 0:
+                msg += f" — Saldo pendiente: {moneda} {saldo_total}"
+            flash(msg)
         else:
             flash("No se ingresó ningún servicio.")
     except Exception as e:
