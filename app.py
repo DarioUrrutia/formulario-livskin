@@ -253,13 +253,14 @@ def guardar_venta():
             ])
 
         # ── Fase 3: registrar en Cobros (uno por ítem pagado, relacional) ─────
+        credito_aplicado = to_float(request.form.get("credito_aplicado", "0"))
+        _, _, cobros, _ = get_sheets()
+        cobros_idx = 0
+
         if total_pagado_hoy > 0:
-            _, _, cobros, _ = get_sheets()
-            cobros_idx = 0
             for item in items_prep:
                 if item["pago"] <= 0:
                     continue
-                # Métodos de pago solo en el primer cobro de esta venta
                 ef_c = efectivo if cobros_idx == 0 else ""
                 ya_c = yape     if cobros_idx == 0 else ""
                 pl_c = plin     if cobros_idx == 0 else ""
@@ -273,6 +274,44 @@ def guardar_venta():
                     item["cod_item"], item["categoria"]
                 ])
                 cobros_idx += 1
+
+        # ── Fase 4: registrar crédito por exceso de pago ────────────────────
+        credito_exceso = to_float(request.form.get("credito_exceso", "0"))
+        nota_exceso    = request.form.get("credito_exceso_nota", "").strip()
+        if credito_exceso > 0:
+            num_cobro = siguiente_numero(cobros)
+            categoria_credito = f"CRÉDITO: {nota_exceso}" if nota_exceso else "CRÉDITO"
+            cobros.append_row([
+                num_cobro, fecha, cod_cliente, cliente,
+                round(credito_exceso),
+                "", "", "", "",
+                "Crédito generado por exceso de pago",
+                "", categoria_credito
+            ])
+
+        # ── Fase 5: registrar crédito aplicado (vinculado al ítem) ───────────
+        if credito_aplicado > 0 and items_prep:
+            # Distribuir el crédito proporcionalmente entre los ítems
+            total_items = sum(it["precio"] for it in items_prep) or 1
+            credito_restante = credito_aplicado
+            for idx, item in enumerate(items_prep):
+                if credito_restante <= 0:
+                    break
+                if item["precio"] <= 0:
+                    continue
+                proporcion = item["precio"] / total_items
+                credito_item = round(min(credito_restante, credito_aplicado * proporcion))
+                if credito_item <= 0:
+                    continue
+                credito_restante -= credito_item
+                num_cobro = siguiente_numero(cobros)
+                cobros.append_row([
+                    num_cobro, fecha, cod_cliente, cliente,
+                    credito_item,
+                    "", "", "", "",
+                    "Crédito aplicado",
+                    item["cod_item"], item["categoria"]
+                ])
 
         if items_prep:
             saldo = round(total_contratado - total_pagado_hoy)
@@ -317,24 +356,47 @@ def guardar_cobro():
     try:
         _, _, cobros, clientes_ws = get_sheets()
         nombre_cobro = request.form.get("cliente_cobro", "")
-        cod_cliente = get_or_create_cliente(clientes_ws, nombre_cobro) if nombre_cobro else ""
-        num = siguiente_numero(cobros)
-        datos = [
-            num,
-            request.form.get("fecha_cobro", ""),
-            cod_cliente,
-            nombre_cobro,
-            request.form.get("monto_cobro", ""),
-            request.form.get("efectivo_cobro", ""),
-            request.form.get("yape_cobro", ""),
-            request.form.get("plin_cobro", ""),
-            request.form.get("giro_cobro", ""),
-            request.form.get("notas_cobro", ""),
-            request.form.get("cod_item_cobro", ""),
-            request.form.get("categoria_cobro", ""),
-        ]
-        cobros.append_row(datos)
-        flash("Cobro registrado correctamente.")
+        cod_cliente  = get_or_create_cliente(clientes_ws, nombre_cobro) if nombre_cobro else ""
+        fecha        = request.form.get("fecha_cobro", "")
+        efectivo     = request.form.get("efectivo_cobro", "")
+        yape         = request.form.get("yape_cobro", "")
+        plin         = request.form.get("plin_cobro", "")
+        giro         = request.form.get("giro_cobro", "")
+        notas        = request.form.get("notas_cobro", "")
+
+        # Leer lista de ítems: cod_item_cobro[] y monto_item_cobro[]
+        cod_items  = request.form.getlist("cod_item_cobro[]")
+        montos     = request.form.getlist("monto_item_cobro[]")
+        categorias = request.form.getlist("categoria_cobro[]")
+
+        # Compatibilidad: si viene el formato antiguo (un solo ítem)
+        if not cod_items:
+            cod_items  = [request.form.get("cod_item_cobro", "")]
+            montos     = [request.form.get("monto_cobro", "")]
+            categorias = [request.form.get("categoria_cobro", "")]
+
+        filas_guardadas = 0
+        for idx, (cod, monto, cat) in enumerate(zip(cod_items, montos, categorias)):
+            if not monto or float(monto or 0) <= 0:
+                continue
+            # Métodos de pago solo en la primera fila
+            ef = efectivo if idx == 0 else ""
+            ya = yape     if idx == 0 else ""
+            pl = plin     if idx == 0 else ""
+            gi = giro     if idx == 0 else ""
+            num = siguiente_numero(cobros)
+            cobros.append_row([
+                num, fecha, cod_cliente, nombre_cobro,
+                round(float(monto)),
+                ef, ya, pl, gi,
+                notas, cod, cat
+            ])
+            filas_guardadas += 1
+
+        if filas_guardadas > 0:
+            flash(f"Cobro registrado correctamente ({filas_guardadas} ítem(s)).")
+        else:
+            flash("No se ingresó ningún monto válido.")
     except Exception as e:
         flash(f"Error al guardar: {e}")
 
@@ -378,6 +440,15 @@ def ver_cliente():
                 except (ValueError, IndexError):
                     pass
 
+    # Calcular DEBE real por ítem: TOTAL - suma de cobros vinculados por COD_ITEM
+    cobros_por_item = calcular_cobros_por_item(todos_cobros)
+    for v in ventas_cliente:
+        cod  = v.get("COD_ITEM", "").strip()
+        total_v = parse_num(v.get("TOTAL S/ (PEN)") or v.get("TOTAL") or "0")
+        cobrado_item = cobros_por_item.get(cod, 0.0) if cod else 0.0
+        debe_real = max(0.0, total_v - cobrado_item)
+        v["DEBE"] = str(round(debe_real))  # sobreescribir con el valor real calculado
+
     saldo = round(facturado_total - cobrado_total, 2)
     return jsonify({
         "ventas": ventas_cliente,
@@ -417,6 +488,26 @@ def parse_num(val):
     except ValueError:
         return 0.0
 
+def calcular_cobros_por_item(todos_cobros):
+    """Retorna dict {cod_item: total_cobrado} sumando todos los cobros por COD_ITEM."""
+    resultado = defaultdict(float)
+    if len(todos_cobros) < 2:
+        return resultado
+    headers = todos_cobros[0]
+    try:
+        idx_cod  = headers.index("COD_ITEM")
+        idx_monto = headers.index("MONTO")
+    except ValueError:
+        return resultado
+    for fila in todos_cobros[1:]:
+        if not any(fila):
+            continue
+        cod  = fila[idx_cod].strip()  if idx_cod  < len(fila) else ""
+        monto = fila[idx_monto].strip() if idx_monto < len(fila) else ""
+        if cod:
+            resultado[cod] += parse_num(monto)
+    return resultado
+
 @app.route("/api/dashboard")
 def api_dashboard():
     desde_str = request.args.get("desde", "")
@@ -432,6 +523,9 @@ def api_dashboard():
     if len(todos) < 2:
         return jsonify({"sin_datos": True})
 
+    # Precalcular cobros por COD_ITEM (todos, sin filtro de fecha)
+    cobros_por_item = calcular_cobros_por_item(todos_cobros)
+
     # ── Leer ventas ───────────────────────────────────────────────────────────
     filas = []
     for row in todos[1:]:
@@ -445,19 +539,21 @@ def api_dashboard():
             continue
         if hasta and fecha > hasta:
             continue
-        cobrado = parse_num(g(13)) + parse_num(g(14)) + parse_num(g(15)) + parse_num(g(16))
+        total_v   = parse_num(g(12))
+        cod_item  = g(6)
+        # cobrado real = suma de todos los cobros vinculados a este ítem (sin filtro de fecha)
+        cobrado_item = cobros_por_item.get(cod_item, 0.0) if cod_item else 0.0
+        cobrado_item = min(cobrado_item, total_v)  # no puede superar el total
+        debe_real    = max(0.0, total_v - cobrado_item)
         filas.append({
             "fecha":     fecha,
             "cliente":   g(3),
             "tipo":      g(5),
+            "cod_item":  cod_item,
             "categoria": g(7),
-            "total":     parse_num(g(12)),
-            "cobrado":   cobrado,
-            "efectivo":  parse_num(g(13)),
-            "yape":      parse_num(g(14)),
-            "plin":      parse_num(g(15)),
-            "giro":      parse_num(g(16)),
-            "debe":      parse_num(g(17)),
+            "total":     total_v,
+            "cobrado":   cobrado_item,
+            "debe":      debe_real,
         })
 
     # ── Leer gastos del mismo período ─────────────────────────────────────────
@@ -521,26 +617,28 @@ def api_dashboard():
     num_promociones = sum(1 for f in filas if f["tipo"] == "Promoción")
     ticket_promedio = ventas_total / num_atenciones if num_atenciones else 0
     tasa_cobro      = (cobrado_total / ventas_total * 100) if ventas_total else 0
-    balance_neto    = cobrado_total - total_gastos
+    # balance neto usa cobros reales recibidos en el período (no cobrado por venta)
+    cobros_periodo_total = sum(c["monto"] for c in cobros_list)
+    balance_neto    = cobros_periodo_total - total_gastos
 
-    # ── Métodos de pago ───────────────────────────────────────────────────────
-    ef_efectivo = sum(f["efectivo"] for f in filas)
-    ef_yape     = sum(f["yape"]     for f in filas)
-    ef_plin     = sum(f["plin"]     for f in filas)
-    ef_giro     = sum(f["giro"]     for f in filas)
+    # ── Métodos de pago (de la hoja Cobros, período filtrado) ─────────────────
+    ef_efectivo = sum(c["efectivo"] for c in cobros_list)
+    ef_yape     = sum(c["yape"]     for c in cobros_list)
+    ef_plin     = sum(c["plin"]     for c in cobros_list)
+    ef_giro     = sum(c["giro"]     for c in cobros_list)
 
     # ── Tratamientos vs Productos ─────────────────────────────────────────────
     total_tratamientos = sum(f["total"] for f in filas if f["tipo"] == "Tratamiento")
     total_productos    = sum(f["total"] for f in filas if f["tipo"] == "Producto")
     total_otros        = ventas_total - total_tratamientos - total_productos
 
-    # ── Ventas por mes (con cobrado y pendiente) ───────────────────────────────
+    # ── Ventas por mes (con cobrado real y pendiente real) ────────────────────
     meses_data = defaultdict(lambda: {"total": 0.0, "cobrado": 0.0, "debe": 0.0})
     for f in filas:
         k = f["fecha"].strftime("%Y-%m")
         meses_data[k]["total"]   += f["total"]
-        meses_data[k]["cobrado"] += f["cobrado"]
-        meses_data[k]["debe"]    += f["debe"]
+        meses_data[k]["cobrado"] += f["cobrado"]  # ya es cobrado real
+        meses_data[k]["debe"]    += f["debe"]      # ya es pendiente real
     por_mes = [
         {"mes": k, "total": round(v["total"], 2),
          "cobrado": round(v["cobrado"], 2), "debe": round(v["debe"], 2)}
@@ -579,11 +677,12 @@ def api_dashboard():
         for f in recientes
     ]
 
-    # ── Cobros: agregados y recientes ─────────────────────────────────────────
-    cobros_ef_efectivo = sum(c["efectivo"] for c in cobros_list)
-    cobros_ef_yape     = sum(c["yape"]     for c in cobros_list)
-    cobros_ef_plin     = sum(c["plin"]     for c in cobros_list)
-    cobros_ef_giro     = sum(c["giro"]     for c in cobros_list)
+    # ── Cobros: recientes ─────────────────────────────────────────────────────
+    # ef_* ya calculados arriba desde cobros_list, reutilizamos
+    cobros_ef_efectivo = ef_efectivo
+    cobros_ef_yape     = ef_yape
+    cobros_ef_plin     = ef_plin
+    cobros_ef_giro     = ef_giro
     cobros_recientes_sorted = sorted(cobros_list, key=lambda x: x["fecha"], reverse=True)[:10]
     cobros_recientes_out = []
     for c in cobros_recientes_sorted:
