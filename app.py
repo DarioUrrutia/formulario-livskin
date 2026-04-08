@@ -45,19 +45,9 @@ def get_gspread_client():
         )
     return gspread.authorize(creds)
 
-def ensure_headers(ws, encabezados):
-    """Actualiza la fila de encabezados si faltan columnas nuevas."""
-    try:
-        current = ws.row_values(1)
-        if current[:len(encabezados)] != encabezados:
-            ws.update('A1', [encabezados])
-    except Exception:
-        pass
-
 def get_or_create_worksheet(spreadsheet, nombre, encabezados):
     try:
         ws = spreadsheet.worksheet(nombre)
-        ensure_headers(ws, encabezados)
     except gspread.WorksheetNotFound:
         ws = spreadsheet.add_worksheet(title=nombre, rows=2000, cols=max(len(encabezados), 20))
         ws.append_row(encabezados)
@@ -126,6 +116,27 @@ def obtener_clientes(sheet_ventas):
             nombres.add(fila[2].strip())
     return sorted(nombres)
 
+# ── Actualizar headers (llamar una vez después de deploy) ────────────────────
+
+@app.route("/actualizar-headers")
+def actualizar_headers():
+    try:
+        client = get_gspread_client()
+        spreadsheet = client.open_by_key(SHEET_ID)
+        for nombre, enc in [
+            ("Ventas",   ENCABEZADOS_VENTAS),
+            ("Cobros",   ENCABEZADOS_COBROS),
+            ("Clientes", ENCABEZADOS_CLIENTES),
+        ]:
+            try:
+                ws = spreadsheet.worksheet(nombre)
+                ws.update('A1', [enc])
+            except Exception as e:
+                pass
+        return "Headers actualizados correctamente."
+    except Exception as e:
+        return f"Error: {e}"
+
 # ── Página principal ──────────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET"])
@@ -136,19 +147,22 @@ def index():
     clientes_data = {}
     next_client_num = 1
     try:
-        ventas, _, _, clientes_ws = get_sheets()
-        clientes = obtener_clientes(ventas)
+        _, _, _, clientes_ws = get_sheets()
         todos_c = clientes_ws.get_all_values()
         for fila in todos_c[1:]:
-            if len(fila) > 1 and fila[1].strip():
-                key = fila[1].strip().lower()
-                clientes_codigos[key] = fila[0]
-                clientes_data[key] = {
-                    "codigo":    fila[0] if len(fila) > 0 else "",
-                    "telefono":  fila[2] if len(fila) > 2 else "",
-                    "cumpleanos": fila[3] if len(fila) > 3 else "",
-                    "email":     fila[5] if len(fila) > 5 else "",
-                }
+            if not (len(fila) > 1 and fila[1].strip()):
+                continue
+            nombre_c = fila[1].strip()
+            key = nombre_c.lower()
+            clientes.append(nombre_c)
+            clientes_codigos[key] = fila[0]
+            clientes_data[key] = {
+                "codigo":     fila[0] if len(fila) > 0 else "",
+                "telefono":   fila[2] if len(fila) > 2 else "",
+                "cumpleanos": fila[3] if len(fila) > 3 else "",
+                "email":      fila[5] if len(fila) > 5 else "",
+            }
+        clientes.sort()
         next_client_num = len([r for r in todos_c[1:] if any(r)]) + 1
     except Exception:
         pass
