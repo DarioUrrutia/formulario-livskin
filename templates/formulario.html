@@ -246,78 +246,30 @@
                 </div>
             </div>
 
-            <div class="seccion">Servicio</div>
-            <div class="field">
-                <label>Tipo *</label>
-                <select name="tipo" id="tipo-venta" onchange="actualizarVenta()" required>
-                    <option value="">— Seleccionar —</option>
-                    <option value="Tratamiento">Tratamiento</option>
-                    <option value="Producto">Producto</option>
-                    <option value="Promoción">Promoción (sin cobro)</option>
-                    <option value="Otros">Otros</option>
-                </select>
+            <div class="fila-dos">
+                <div class="field">
+                    <label>Próxima Cita</label>
+                    <input type="date" name="proxima_cita">
+                </div>
+                <div class="field">
+                    <label>Cumpleaños</label>
+                    <input type="date" name="cumpleanos">
+                </div>
             </div>
 
-            <div id="venta-detalle">
-                <div class="field">
-                    <label>Categoría</label>
-                    <select name="categoria" id="categoria-venta" onchange="mostrarOtroVenta(this)">
-                        <option value="">— Seleccionar —</option>
-                        <optgroup label="Tratamientos">
-                            <option>Botox</option>
-                            <option>Ácido Hialurónico</option>
-                            <option>PRP</option>
-                            <option>Hilos</option>
-                            <option>Limpieza Facial</option>
-                            <option>Exosoma / Vtech</option>
-                            <option>Esperma de Salmón</option>
-                            <option>Vitamina C / Cóctel de vida</option>
-                            <option>Ozono</option>
-                            <option>Autohemoterapia</option>
-                            <option>Infiltración</option>
-                            <option>Bioestimuladores</option>
-                            <option>Rinomodelación con Ac. Hialurónico</option>
-                            <option>Bléfaroplastia</option>
-                            <option>Cauterización</option>
-                            <option>Lifting Facial</option>
-                            <option>Microblending</option>
-                            <option>Pigmentación de Labios</option>
-                            <option>Retiro de Lipoma</option>
-                            <option>Subcisión con PRP</option>
-                            <option>Certificado Médico</option>
-                        </optgroup>
-                        <optgroup label="Productos">
-                            <option>Bloqueador</option>
-                            <option>Hidratante Forte</option>
-                            <option>Jabón</option>
-                            <option>Shampoo</option>
-                            <option>Loción</option>
-                            <option>Exfoliante</option>
-                            <option>Mascarilla</option>
-                            <option>Vitamina C Sérum</option>
-                        </optgroup>
-                        <option value="__otro__">Otro (escribir)</option>
-                    </select>
-                </div>
-                <div class="field" id="campo-otro-venta" style="display:none;">
-                    <label>Especificar</label>
-                    <input type="text" name="categoria_otro" id="categoria-otro-venta" placeholder="Escribir categoría">
-                </div>
-                <div class="field">
-                    <label>Zona / Cantidad / Envase</label>
-                    <input type="text" name="zona_cantidad_envase" placeholder="Ej: 3 Superior, 2 und...">
-                </div>
-                <div class="fila-dos">
-                    <div class="field">
-                        <label>Próxima Cita</label>
-                        <input type="date" name="proxima_cita">
-                    </div>
-                    <div class="field">
-                        <label>Cumpleaños</label>
-                        <input type="date" name="cumpleanos">
-                    </div>
-                </div>
-            </div>
+            <div class="seccion">Servicios / Productos</div>
+
+            <div id="items-container"></div>
+
+            <input type="hidden" name="num_items" id="num_items" value="0">
+
+            <button type="button" onclick="agregarItem()" style="
+                width:100%; padding:10px; margin-bottom:16px;
+                background:white; color:#C0392B;
+                border: 2px dashed #C0392B; border-radius:8px;
+                font-size:14px; font-weight:bold; cursor:pointer;">
+                + Agregar servicio / producto
+            </button>
 
             <div id="venta-pago">
                 <div class="seccion">Pago</div>
@@ -709,9 +661,131 @@ function cambiarTab(tab) {
     document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
 }
 
+// ── Items dinámicos ───────────────────────────────────────────────────────────
+let itemCount = 0;
+
+const CATEGORIAS_HTML = `
+    <option value="">— Seleccionar —</option>
+    <optgroup label="Tratamientos">
+        <option>Botox</option>
+        <option>Ácido Hialurónico</option>
+        <option>PRP</option>
+        <option>Hilos</option>
+        <option>Limpieza Facial</option>
+        <option>Exosoma / Vtech</option>
+        <option>Esperma de Salmón</option>
+        <option>Vitamina C / Cóctel de vida</option>
+        <option>Ozono</option>
+        <option>Autohemoterapia</option>
+        <option>Infiltración</option>
+        <option>Bioestimuladores</option>
+        <option>Rinomodelación con Ac. Hialurónico</option>
+        <option>Bléfaroplastia</option>
+        <option>Cauterización</option>
+        <option>Lifting Facial</option>
+        <option>Microblending</option>
+        <option>Pigmentación de Labios</option>
+        <option>Retiro de Lipoma</option>
+        <option>Subcisión con PRP</option>
+        <option>Certificado Médico</option>
+    </optgroup>
+    <optgroup label="Productos">
+        <option>Bloqueador</option>
+        <option>Hidratante Forte</option>
+        <option>Jabón</option>
+        <option>Shampoo</option>
+        <option>Loción</option>
+        <option>Exfoliante</option>
+        <option>Mascarilla</option>
+        <option>Vitamina C Sérum</option>
+    </optgroup>
+    <option value="__otro__">Otro (escribir)</option>
+`;
+
+function agregarItem() {
+    const i = itemCount++;
+    const container = document.getElementById('items-container');
+    const div = document.createElement('div');
+    div.id = 'item-' + i;
+    div.style.cssText = 'background:#fafafa;border:1.5px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px;position:relative;';
+    div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:11px;font-weight:bold;color:#C0392B;text-transform:uppercase;letter-spacing:1px;">
+                Ítem ${i + 1}
+            </span>
+            ${i > 0 ? `<button type="button" onclick="eliminarItem(${i})"
+                style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:0 4px;"
+                title="Eliminar">✕</button>` : ''}
+        </div>
+        <div class="field">
+            <label>Tipo *</label>
+            <select name="tipo_${i}" onchange="actualizarPagoVisibility()" required>
+                <option value="">— Seleccionar —</option>
+                <option value="Tratamiento">Tratamiento</option>
+                <option value="Producto">Producto</option>
+                <option value="Promoción">Promoción (sin cobro)</option>
+                <option value="Otros">Otros</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Categoría</label>
+            <select name="categoria_${i}" onchange="toggleOtroItem(this, ${i})">${CATEGORIAS_HTML}</select>
+        </div>
+        <div class="field" id="otro-wrap-${i}" style="display:none;">
+            <label>Especificar</label>
+            <input type="text" name="categoria_otro_${i}" placeholder="Escribir categoría">
+        </div>
+        <div class="field">
+            <label>Zona / Cantidad / Envase</label>
+            <input type="text" name="zona_${i}" placeholder="Ej: 3 Superior, 2 und...">
+        </div>
+        <div class="field">
+            <label>Total de este ítem</label>
+            <input type="number" name="total_item_${i}" placeholder="0.00" step="0.01"
+                   oninput="calcularTotalVenta()">
+        </div>
+    `;
+    container.appendChild(div);
+    document.getElementById('num_items').value = itemCount;
+}
+
+function eliminarItem(i) {
+    const el = document.getElementById('item-' + i);
+    if (el) el.remove();
+    calcularTotalVenta();
+}
+
+function toggleOtroItem(sel, i) {
+    const wrap = document.getElementById('otro-wrap-' + i);
+    if (wrap) wrap.style.display = sel.value === '__otro__' ? 'block' : 'none';
+}
+
+function calcularTotalVenta() {
+    let total = 0;
+    document.querySelectorAll('[name^="total_item_"]').forEach(inp => {
+        total += parseFloat(inp.value || 0);
+    });
+    const totalField = document.getElementById('total-venta');
+    if (totalField) totalField.value = total > 0 ? total.toFixed(2) : '';
+}
+
+function actualizarPagoVisibility() {
+    const tipos = Array.from(document.querySelectorAll('[name^="tipo_"]')).map(s => s.value);
+    const soloPromos = tipos.length > 0 && tipos.every(t => t === 'Promoción');
+    const pagoDiv = document.getElementById('venta-pago-campos');
+    const avisoPromo = document.getElementById('aviso-promo');
+    if (soloPromos) {
+        pagoDiv.style.display = 'none';
+        avisoPromo.style.display = 'block';
+    } else {
+        pagoDiv.style.display = 'block';
+        avisoPromo.style.display = 'none';
+    }
+}
+
 // ── Lógica Venta ─────────────────────────────────────────────────────────────
 function actualizarVenta() {
-    const tipo = document.getElementById('tipo-venta').value;
+    const tipo = document.getElementById('tipo-venta') ? document.getElementById('tipo-venta').value : '';
     const pagoDiv = document.getElementById('venta-pago-campos');
     const avisoPromo = document.getElementById('aviso-promo');
     const totalInput = document.getElementById('total-venta');
@@ -938,6 +1012,9 @@ cambiarTab = function(tab) {
     const el = document.getElementById(id);
     if (el) el.valueAsDate = new Date();
 });
+
+// Cargar primer ítem al iniciar
+agregarItem();
 </script>
 </body>
 </html>

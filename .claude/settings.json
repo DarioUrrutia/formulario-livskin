@@ -3,7 +3,9 @@
     "allow": [
       "Bash(py -c ':*)",
       "Bash(py \"C:/Users/JeanUrrutia/ProyectosClaude/setup_acceso.py\")",
-      "Bash(py -m pip install gspread google-auth -q)"
+      "Bash(py -m pip install gspread google-auth -q)",
+      "Bash(py app.py)",
+      "Bash(py -c \"from app import app; print\\('OK'\\)\")"
     ]
   }
 }

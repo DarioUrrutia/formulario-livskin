@@ -12,8 +12,8 @@ app.secret_key = "livskin2024"
 SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 
 ENCABEZADOS_VENTAS = [
-    "#", "FECHA", "CLIENTE", "TELEFONO", "TIPO", "CATEGORIA",
-    "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "CUMPLEANOS",
+    "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
+    "CATEGORIA", "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "CUMPLEANOS",
     "MONEDA", "TOTAL", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE"
 ]
 
@@ -22,7 +22,11 @@ ENCABEZADOS_GASTOS = [
 ]
 
 ENCABEZADOS_COBROS = [
-    "#", "FECHA", "CLIENTE", "MONTO", "EFECTIVO", "YAPE", "PLIN", "GIRO", "NOTAS"
+    "#", "FECHA", "COD_CLIENTE", "CLIENTE", "MONTO", "EFECTIVO", "YAPE", "PLIN", "GIRO", "NOTAS"
+]
+
+ENCABEZADOS_CLIENTES = [
+    "COD_CLIENTE", "NOMBRE", "TELEFONO", "CUMPLEANOS", "FECHA_REGISTRO"
 ]
 
 def get_gspread_client():
@@ -51,22 +55,52 @@ def get_or_create_worksheet(spreadsheet, nombre, encabezados):
 def get_sheets():
     client = get_gspread_client()
     spreadsheet = client.open_by_key(SHEET_ID)
-    ventas  = get_or_create_worksheet(spreadsheet, "Ventas",  ENCABEZADOS_VENTAS)
-    gastos  = get_or_create_worksheet(spreadsheet, "Gastos",  ENCABEZADOS_GASTOS)
-    cobros  = get_or_create_worksheet(spreadsheet, "Cobros",  ENCABEZADOS_COBROS)
-    return ventas, gastos, cobros
+    ventas   = get_or_create_worksheet(spreadsheet, "Ventas",   ENCABEZADOS_VENTAS)
+    gastos   = get_or_create_worksheet(spreadsheet, "Gastos",   ENCABEZADOS_GASTOS)
+    cobros   = get_or_create_worksheet(spreadsheet, "Cobros",   ENCABEZADOS_COBROS)
+    clientes = get_or_create_worksheet(spreadsheet, "Clientes", ENCABEZADOS_CLIENTES)
+    return ventas, gastos, cobros, clientes
+
+def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos=""):
+    """Retorna el código del cliente, creándolo si no existe."""
+    todos = clientes_ws.get_all_values()
+    nombre_lower = nombre.strip().lower()
+    for fila in todos[1:]:
+        if len(fila) > 1 and fila[1].strip().lower() == nombre_lower:
+            return fila[0]
+    # Crear nuevo cliente
+    num = len([r for r in todos[1:] if any(r)]) + 1
+    codigo = f"LIVCLIENT{num:04d}"
+    clientes_ws.append_row([codigo, nombre.strip(), telefono, cumpleanos, str(date.today())])
+    return codigo
+
+def get_next_item_code(ventas_ws, tipo):
+    """Genera el siguiente código LIVTRAT#### o LIVPROD####."""
+    prefix = "LIVTRAT" if tipo == "Tratamiento" else "LIVPROD"
+    todos = ventas_ws.get_all_values()
+    max_num = 0
+    for fila in todos[1:]:
+        # COD_ITEM está en índice 6
+        if len(fila) > 6 and str(fila[6]).startswith(prefix):
+            try:
+                num = int(fila[6][len(prefix):])
+                max_num = max(max_num, num)
+            except ValueError:
+                pass
+    return f"{prefix}{max_num + 1:04d}"
 
 def siguiente_numero(sheet):
     todos = sheet.get_all_values()
-    datos = [r for r in todos[1:] if any(r)]
+    # Solo contar filas que tengan datos reales (al menos fecha o nombre, no solo numero)
+    datos = [r for r in todos[1:] if len(r) > 1 and any(r[1:])]
     return len(datos) + 1
 
 def obtener_clientes(sheet_ventas):
     todos = sheet_ventas.get_all_values()
     nombres = set()
     for fila in todos[1:]:
-        if len(fila) > 2 and fila[2].strip():
-            nombres.add(fila[2].strip())
+        if len(fila) > 3 and fila[3].strip():
+            nombres.add(fila[3].strip())
     return sorted(nombres)
 
 # ── Página principal ──────────────────────────────────────────────────────────
@@ -75,7 +109,7 @@ def obtener_clientes(sheet_ventas):
 def index():
     active_tab = request.args.get("tab", "venta")
     try:
-        ventas, _, _ = get_sheets()
+        ventas, _, _, _ = get_sheets()
         clientes = obtener_clientes(ventas)
     except Exception:
         clientes = []
@@ -85,33 +119,68 @@ def index():
 
 @app.route("/venta", methods=["POST"])
 def guardar_venta():
-    categoria = request.form.get("categoria", "")
-    if categoria == "__otro__":
-        categoria = request.form.get("categoria_otro", "")
-
     try:
-        ventas, _, _ = get_sheets()
-        num = siguiente_numero(ventas)
-        datos = [
-            num,
-            request.form.get("fecha", ""),
-            request.form.get("cliente", ""),
-            request.form.get("telefono", ""),
-            request.form.get("tipo", ""),
-            categoria,
-            request.form.get("zona_cantidad_envase", ""),
-            request.form.get("proxima_cita", ""),
-            request.form.get("cumpleanos", ""),
-            request.form.get("moneda", "SOLES"),
-            request.form.get("total", ""),
-            request.form.get("efectivo", ""),
-            request.form.get("yape", ""),
-            request.form.get("plin", ""),
-            request.form.get("giro", ""),
-            request.form.get("debe", ""),
-        ]
-        ventas.append_row(datos)
-        flash("Venta guardada correctamente.")
+        ventas, _, _, clientes_ws = get_sheets()
+
+        # Datos compartidos del cliente
+        fecha      = request.form.get("fecha", "")
+        cliente    = request.form.get("cliente", "")
+        telefono   = request.form.get("telefono", "")
+        prox_cita  = request.form.get("proxima_cita", "")
+        cumpleanos = request.form.get("cumpleanos", "")
+        moneda     = request.form.get("moneda", "SOLES")
+
+        # Obtener o crear código de cliente
+        cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos)
+
+        # Pago (solo en el primer ítem)
+        efectivo   = request.form.get("efectivo", "")
+        yape       = request.form.get("yape", "")
+        plin       = request.form.get("plin", "")
+        giro       = request.form.get("giro", "")
+        debe       = request.form.get("debe", "")
+
+        num_items = int(request.form.get("num_items", 1))
+        filas_guardadas = 0
+
+        for i in range(num_items):
+            tipo = request.form.get(f"tipo_{i}", "")
+            if not tipo:
+                continue
+
+            categoria = request.form.get(f"categoria_{i}", "")
+            if categoria == "__otro__":
+                categoria = request.form.get(f"categoria_otro_{i}", "")
+
+            zona  = request.form.get(f"zona_{i}", "")
+            total = request.form.get(f"total_item_{i}", "")
+
+            # Código de ítem según tipo
+            if tipo in ("Tratamiento", "Promoción"):
+                cod_item = get_next_item_code(ventas, "Tratamiento")
+            elif tipo == "Producto":
+                cod_item = get_next_item_code(ventas, "Producto")
+            else:
+                cod_item = ""
+
+            # Pago solo en el primer ítem guardado
+            ef = efectivo if filas_guardadas == 0 else ""
+            ya = yape     if filas_guardadas == 0 else ""
+            pl = plin     if filas_guardadas == 0 else ""
+            gi = giro     if filas_guardadas == 0 else ""
+            de = debe     if filas_guardadas == 0 else ""
+
+            num = siguiente_numero(ventas)
+            datos = [num, fecha, cod_cliente, cliente, telefono, tipo, cod_item,
+                     categoria, zona, prox_cita, cumpleanos, moneda, total,
+                     ef, ya, pl, gi, de]
+            ventas.append_row(datos)
+            filas_guardadas += 1
+
+        if filas_guardadas > 0:
+            flash(f"Venta guardada ({filas_guardadas} ítem(s)) — Cliente: {cod_cliente}")
+        else:
+            flash("No se ingresó ningún servicio.")
     except Exception as e:
         flash(f"Error al guardar: {e}")
 
@@ -122,7 +191,7 @@ def guardar_venta():
 @app.route("/gasto", methods=["POST"])
 def guardar_gasto():
     try:
-        _, gastos, _ = get_sheets()
+        _, gastos, _, _ = get_sheets()
         num = siguiente_numero(gastos)
         datos = [
             num,
@@ -145,12 +214,15 @@ def guardar_gasto():
 @app.route("/cobro", methods=["POST"])
 def guardar_cobro():
     try:
-        _, _, cobros = get_sheets()
+        _, _, cobros, clientes_ws = get_sheets()
+        nombre_cobro = request.form.get("cliente_cobro", "")
+        cod_cliente = get_or_create_cliente(clientes_ws, nombre_cobro) if nombre_cobro else ""
         num = siguiente_numero(cobros)
         datos = [
             num,
             request.form.get("fecha_cobro", ""),
-            request.form.get("cliente_cobro", ""),
+            cod_cliente,
+            nombre_cobro,
             request.form.get("monto_cobro", ""),
             request.form.get("efectivo_cobro", ""),
             request.form.get("yape_cobro", ""),
@@ -173,7 +245,7 @@ def ver_cliente():
     if not nombre:
         return jsonify({"ventas": [], "cobros": [], "debe_total": 0, "cobrado_total": 0, "saldo": 0})
 
-    ventas_ws, _, cobros_ws = get_sheets()
+    ventas_ws, _, cobros_ws, _ = get_sheets()
 
     # Ventas del cliente
     todas_ventas = ventas_ws.get_all_values()
@@ -182,10 +254,11 @@ def ver_cliente():
     if len(todas_ventas) > 1:
         headers = todas_ventas[0]
         for fila in todas_ventas[1:]:
-            if len(fila) > 2 and fila[2].strip().lower() == nombre:
+            # CLIENTE está en índice 3 (después de COD_CLIENTE)
+            if len(fila) > 3 and fila[3].strip().lower() == nombre:
                 ventas_cliente.append(dict(zip(headers, fila)))
                 try:
-                    debe_total += float(str(fila[15]).replace(",", ".") or 0)
+                    debe_total += float(str(fila[17]).replace(",", ".") or 0)
                 except (ValueError, IndexError):
                     pass
 
@@ -196,10 +269,11 @@ def ver_cliente():
     if len(todos_cobros) > 1:
         headers_c = todos_cobros[0]
         for fila in todos_cobros[1:]:
-            if len(fila) > 2 and fila[2].strip().lower() == nombre:
+            # CLIENTE está en índice 3 (después de COD_CLIENTE)
+            if len(fila) > 3 and fila[3].strip().lower() == nombre:
                 cobros_cliente.append(dict(zip(headers_c, fila)))
                 try:
-                    cobrado_total += float(str(fila[3]).replace(",", ".") or 0)
+                    cobrado_total += float(str(fila[4]).replace(",", ".") or 0)
                 except (ValueError, IndexError):
                     pass
 
@@ -248,7 +322,7 @@ def api_dashboard():
     desde = parse_fecha(desde_str)
     hasta = parse_fecha(hasta_str)
 
-    ventas_ws, gastos_ws, _ = get_sheets()
+    ventas_ws, gastos_ws, _, _ = get_sheets()
     todos       = ventas_ws.get_all_values()
     todos_gasto = gastos_ws.get_all_values()
 
