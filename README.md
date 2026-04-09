@@ -1,57 +1,117 @@
 # Formulario Livskin
 
-Formulario web para registro de atenciones y ventas de **Livskin Professional Skincare**.
+Sistema de gestión interno para **Livskin Professional Skincare** — registro de clientes, ventas, cobros y análisis de negocio, accesible desde cualquier celular o computadora.
 
-## ¿Qué hace?
+🔗 **https://formulario-livskin.onrender.com**
 
-Permite registrar desde cualquier celular o computadora los datos de cada atención:
-- Fecha, área, tipo y categoría del tratamiento
-- Zona / cantidad / envase
-- Teléfono y próxima cita
-- Cumpleaños del cliente
-- Métodos de pago: efectivo, Yape, Plin, Giro, debe y saldo
+---
 
-Los datos se guardan automáticamente en **Google Sheets** en tiempo real.
+## ¿Qué puede hacer el sistema?
 
-## Link del formulario
+### Pestaña Venta
+- Registro completo de atenciones: cliente, fecha, tipo (Tratamiento / Producto / Certificado / Promoción), categoría, zona/cantidad/envase, próxima cita
+- Múltiples ítems por venta en una sola sesión
+- Conversión automática de monedas (USD/EUR → Soles) usando tipo de cambio en tiempo real
+- Métodos de pago: Efectivo, Yape, Plin, Giro — con distribución individual por ítem
+- **Distribución inteligente de pago**: el último ítem se auto-llena con el restante disponible
+- **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
+- Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
+- Protección contra doble registro (botón se deshabilita al enviar)
 
-🔗 https://formulario-livskin.onrender.com
+### Pestaña Gasto
+- Registro de gastos del negocio: tipo, descripción, destinatario, monto y método de pago
 
-## Tecnologías usadas
+### Pestaña Cobro
+- Registro de cobros independientes sobre ítems con saldo pendiente
+- Búsqueda de cliente y listado de ítems con deuda activa
+- Asignación de monto por ítem con código único `LIVCOBRO####`
+- Métodos de pago: Efectivo, Yape, Plin, Giro
 
-- **Python + Flask** — servidor web
-- **Google Sheets API (gspread)** — base de datos
-- **Render** — hosting gratuito
-- **HTML/CSS** — diseño del formulario
+### Pestaña Cliente
+- Búsqueda de cliente por nombre
+- Historial en dos vistas:
+  - **Por ítem**: cada servicio vendido con sus cobros asociados, estado (Pagado / Debe), fecha y zona
+  - **Cronológico**: agrupado por día con ventas y cobros del día, totales al pie
+- Saldo a favor (crédito) mostrado cuando el cobrado supera lo facturado
+- Cálculo real de deuda por ítem (basado en cobros vinculados, no en el dato original)
+
+### Pestaña Dashboard
+
+#### Sub-panel General
+- KPIs financieros del período: Total Facturado, Total Cobrado, Por Cobrar, Ticket Promedio, Tasa de Cobro, Balance Neto
+- **Comparativas siempre actualizadas**: Mes actual vs mes anterior (monto + % ▲▼) y Año actual vs año anterior
+- Gráfico de evolución mensual: barras apiladas Cobrado / Pendiente
+- **Tabla por tipo** (Tratamientos / Productos): mes actual vs mes anterior con variación porcentual
+- Gráfico de top categorías del mes actual
+- KPIs operativos: N° Atenciones, Clientes Únicos, Promociones, Tratamientos, Productos, Gastos
+- Mix de ventas (donut: Tratamientos / Productos / Otros)
+- Tabla de atenciones recientes
+
+#### Sub-panel Clientes
+- **Top 20% de clientes** del período (Pareto): facturado, visitas, frecuencia por mes, categoría que más compra
+- Columna de evolución: compara mes actual vs mes anterior con flecha ▲▼ por cliente
+- Gráfico de barras top clientes
+- Gráfico top categorías del período
+- **Deudores por antigüedad** (calculado al día de hoy):
+  - Menos de 1 mes
+  - 1 a 2 meses
+  - 2 a 3 meses
+  - Más de 3 meses
+  - Cada bucket muestra: cliente, categoría, monto que debe, fecha de venta y días transcurridos
+
+#### Sub-panel Cobros
+- Total cobrado y N° de cobros del período
+- Desglose por método: Efectivo, Yape, Plin, Giro (con gráfico donut)
+- Tabla de cobros recientes
+- **Pendientes de cobro por antigüedad**: misma clasificación de buckets que deudores, con detalle por ítem
+
+---
+
+## Tecnologías
+
+| Componente | Tecnología |
+|---|---|
+| Backend | Python 3 + Flask |
+| Base de datos | Google Sheets vía gspread |
+| Hosting | Render (plan gratuito) |
+| Frontend | HTML / CSS / JavaScript vanilla |
+| Gráficos | Chart.js |
+| Tipo de cambio | @fawazahmed0/currency-api |
+| Keep-alive | cron-job.org (ping cada 14 min) |
 
 ## Estructura del proyecto
 
 ```
 ProyectosClaude/
-├── app.py                  # Servidor Flask principal
-├── requirements.txt        # Dependencias de Python
-├── render.yaml             # Configuración de Render
+├── app.py                  # Servidor Flask: rutas, lógica de negocio, API dashboard
+├── requirements.txt        # Dependencias Python
+├── render.yaml             # Configuración Render (gunicorn --timeout 120 --workers 2)
 ├── templates/
-│   └── formulario.html     # Diseño del formulario web
+│   └── formulario.html     # UI completa: formularios, historial, dashboard
 └── static/
-    └── logo.png            # Logo de Livskin
+    └── logo.png
 ```
 
-## Configuración para desarrollo local
+## Hojas de Google Sheets
 
-1. Instalar dependencias:
-   ```
-   pip install -r requirements.txt
-   ```
+| Hoja | Columnas principales |
+|---|---|
+| Ventas | #, FECHA, COD_CLIENTE, CLIENTE, TELEFONO, TIPO, COD_ITEM, CATEGORIA, ZONA, PROXIMA CITA, FECHA_NAC, MONEDA, TOTAL S/ (PEN), EFECTIVO, YAPE, PLIN, GIRO, DEBE, PAGADO, TC |
+| Cobros | #, FECHA, COD_CLIENTE, CLIENTE, MONTO, EFECTIVO, YAPE, PLIN, GIRO, NOTAS, COD_ITEM, CATEGORIA, COD_COBRO |
+| Clientes | COD_CLIENTE, NOMBRE, TELEFONO, FECHA_NAC, FECHA_REGISTRO, EMAIL |
+| Gastos | #, FECHA, TIPO, DESCRIPCION, DESTINATARIO, MONTO, METODO DE PAGO |
 
-2. Agregar el archivo de credenciales de Google (`livskin-formulario-xxxx.json`) en la carpeta raíz.
+## Desarrollo local
 
-3. Ejecutar:
-   ```
-   py app.py
-   ```
+```bash
+pip install -r requirements.txt
+py app.py
+```
 
-## Notas
+Requiere el archivo de credenciales de Google (`livskin-formulario-xxxx.json`) en la raíz del proyecto (nunca se sube a GitHub).
 
-- El plan gratuito de Render puede tardar ~50 segundos en cargar si estuvo inactivo.
-- Las credenciales de Google nunca se suben a GitHub (están en `.gitignore`).
+## Notas técnicas
+
+- Caché en memoria por proceso gunicorn con TTL de 90 segundos — lecturas de Sheets son rápidas después de la primera
+- El caché se invalida automáticamente después de cada escritura (venta, cobro, gasto)
+- Endpoint `/ping` para keep-alive con cron externo, evita cold start de 30-60s en Render free tier
