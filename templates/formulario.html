@@ -339,21 +339,21 @@
                 <div class="fila-dos">
                     <div class="field">
                         <label>Efectivo</label>
-                        <input type="number" name="efectivo" id="ef-efectivo" placeholder="0" step="1" min="0" oninput="actualizarDistribucion()">
+                        <input type="number" name="efectivo" id="ef-efectivo" placeholder="0" step="1" min="0" oninput="autoRellenarPorPago()">
                     </div>
                     <div class="field">
                         <label>Yape</label>
-                        <input type="number" name="yape" id="ef-yape" placeholder="0" step="1" min="0" oninput="actualizarDistribucion()">
+                        <input type="number" name="yape" id="ef-yape" placeholder="0" step="1" min="0" oninput="autoRellenarPorPago()">
                     </div>
                 </div>
                 <div class="fila-dos">
                     <div class="field">
                         <label>Plin</label>
-                        <input type="number" name="plin" id="ef-plin" placeholder="0" step="1" min="0" oninput="actualizarDistribucion()">
+                        <input type="number" name="plin" id="ef-plin" placeholder="0" step="1" min="0" oninput="autoRellenarPorPago()">
                     </div>
                     <div class="field">
                         <label>Giro</label>
-                        <input type="number" name="giro" id="ef-giro" placeholder="0" step="1" min="0" oninput="actualizarDistribucion()">
+                        <input type="number" name="giro" id="ef-giro" placeholder="0" step="1" min="0" oninput="autoRellenarPorPago()">
                     </div>
                 </div>
 
@@ -980,9 +980,8 @@ function actualizarCodigoCliente() {
                         debe:      parseFloat(v.DEBE || 0),
                         total:     parseFloat(v['TOTAL S/ (PEN)'] || v.TOTAL || 0),
                     }));
-                // Inicializar con monto completo como predeterminado
+                // Empezar en 0 — se llenarán cuando el usuario ingrese el pago
                 deudasPagos = {};
-                deudasPendientesCliente.forEach((d, idx) => { deudasPagos[idx] = d.debe; });
 
                 const alertaEl = document.getElementById('alerta-deuda-venta');
                 if (deudasPendientesCliente.length > 0) {
@@ -1040,7 +1039,7 @@ function aplicarCredito() {
         resultado.innerHTML = `Crédito cubre <strong>S/ ${Math.round(aplicado)}</strong> — aún debe pagar <strong>S/ ${Math.round(resta)}</strong> hoy.`;
         secPago.style.display = 'block';
     }
-    actualizarDistribucion();
+    autoRellenarPorPago();
 }
 
 function agregarItem() {
@@ -1387,6 +1386,32 @@ function actualizarResumen() {
     actualizarDistribucion();
 }
 
+// Llamada cuando el usuario ingresa efectivo/yape/plin/giro.
+// Auto-llena primero las deudas, luego deja que actualizarDistribucion
+// calcule el restante para el último ítem nuevo.
+function autoRellenarPorPago() {
+    const creditoAplicado = parseFloat(document.getElementById('credito-aplicado-input')?.value) || 0;
+    const pagadoHoy =
+        (parseFloat(document.getElementById('ef-efectivo')?.value) || 0) +
+        (parseFloat(document.getElementById('ef-yape')?.value)    || 0) +
+        (parseFloat(document.getElementById('ef-plin')?.value)    || 0) +
+        (parseFloat(document.getElementById('ef-giro')?.value)    || 0) +
+        creditoAplicado;
+
+    // Rellenar deudas en orden: hasta cubrir cada una con lo disponible
+    let disponibleDeuda = pagadoHoy;
+    deudasPendientesCliente.forEach((d, idx) => {
+        const inputEl = document.getElementById(`deuda_monto_${idx}`);
+        if (!inputEl) return;
+        const autoVal = Math.round(Math.min(d.debe, Math.max(0, disponibleDeuda)));
+        inputEl.value = autoVal > 0 ? autoVal : '';
+        deudasPagos[idx] = autoVal;
+        disponibleDeuda -= autoVal;
+    });
+
+    actualizarDistribucion();
+}
+
 function actualizarDistribucion() {
     const items = getItemsData();
     const totalSoles = items.reduce((s, it) => s + it.precioSoles, 0);
@@ -1405,23 +1430,18 @@ function actualizarDistribucion() {
     const saldoFavor = Math.max(0, pagadoHoy - totalSoles - totalDeuda);
     const disponible = Math.max(0, pagadoHoy - saldoFavor);
 
-    // ── 1) Distribuir en deudas primero ──
-    // Solo aplicar el cap de disponible cuando hay dinero real ingresado;
-    // si pagadoHoy=0, los inputs muestran el monto predeterminado sin zeroearse.
+    // ── 1) Deudas: respetar valor actual, solo reducir si excede el disponible ──
     let deudaDistribuida = 0;
     deudasPendientesCliente.forEach((d, idx) => {
         const inputEl = document.getElementById(`deuda_monto_${idx}`);
         if (!inputEl) return;
         let v = parseFloat(inputEl.value || 0);
-        v = Math.min(v, d.debe); // nunca más del monto de deuda
-        if (pagadoHoy > 0) {
-            // Solo reducir si excede lo disponible, nunca forzar a 0 artificialmente
-            const maxParaEste = Math.max(0, disponible - deudaDistribuida);
-            if (v > maxParaEste + 0.5) {
-                v = maxParaEste;
-                inputEl.value = v > 0 ? Math.round(v) : '';
-                deudasPagos[idx] = v;
-            }
+        v = Math.min(v, d.debe);
+        const maxParaEste = Math.max(0, disponible - deudaDistribuida);
+        if (v > maxParaEste + 0.5) {
+            v = maxParaEste;
+            inputEl.value = v > 0 ? Math.round(v) : '';
+            deudasPagos[idx] = v;
         }
         deudaDistribuida += v;
     });
