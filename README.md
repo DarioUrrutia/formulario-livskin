@@ -15,7 +15,7 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - Métodos de pago: Efectivo, Yape, Plin, Giro — con distribución individual por ítem
 - **Distribución automática de pago**: todos los ítems se rellenan en orden al ingresar el pago; siempre editables manualmente
 - **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
-- **Promociones y descuentos por ítem**: opción `Gratis` (precio = 0) o `Descuento S/` (precio cobrado = lista − descuento); queda registrado el descuento otorgado para análisis de costos
+- **Promociones y descuentos por ítem**: opción `Gratis` (TOTAL = 0, no entra en facturado ni por cobrar) o `Descuento S/` (precio cobrado = lista − descuento); el monto cedido queda registrado en `DESCUENTO S/` para análisis de costo de promociones
 - **Tipos, categorías y áreas dinámicos**: configurables desde la hoja "Listas" de Google Sheets sin tocar código; la hoja se crea automáticamente con valores por defecto al primer uso
 - Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
 - Protección contra doble registro (botón se deshabilita al enviar)
@@ -45,7 +45,8 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - Gráfico de evolución mensual: barras apiladas Cobrado / Pendiente
 - **Tabla por tipo** (Tratamientos / Productos): mes actual vs mes anterior con variación porcentual
 - Gráfico de top categorías del mes actual
-- KPIs operativos: N° Atenciones, Clientes Únicos, Promociones, Tratamientos, Productos, Gastos
+- KPIs operativos: N° Atenciones, Clientes Únicos, Ítems con descuento, Tratamientos, Productos, Gastos
+- **Descuentos Otorgados**: tarjeta que aparece solo cuando hay promociones en el período, muestra el costo total asumido por la empresa
 - Mix de ventas (donut: Tratamientos / Productos / Otros)
 - Tabla de atenciones recientes
 
@@ -118,3 +119,4 @@ Requiere el archivo de credenciales de Google (`livskin-formulario-xxxx.json`) e
 - Caché en memoria por proceso gunicorn con TTL de 90 segundos — lecturas de Sheets son rápidas después de la primera
 - El caché se invalida automáticamente después de cada escritura (venta, cobro, gasto)
 - Endpoint `/ping` para keep-alive con cron externo, evita cold start de 30-60s en Render free tier
+- Validación server-side en ítems gratis: el backend fuerza TOTAL = 0 independientemente del frontend, usando el flag `es_gratis` + verificación `descuento >= precio_lista`
