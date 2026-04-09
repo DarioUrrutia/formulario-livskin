@@ -1224,20 +1224,25 @@ function marcarGratis(i) {
     const tieneDesc  = document.getElementById(`tiene_desc_${i}`);
     const dcInput    = document.getElementById(`descuento_input_${i}`);
 
-    const flagEl = document.getElementById(`es_gratis_flag_${i}`);
+    const flagEl  = document.getElementById(`es_gratis_flag_${i}`);
+    const hidden  = document.getElementById(`total_item_${i}`);
     if (checked) {
         // Desmarcar "Descuento" y ocultar su input
         if (tieneDesc) tieneDesc.checked = false;
         if (dcInput)   { dcInput.style.display = 'none'; dcInput.value = ''; }
         if (dc)     dc.value = lista;
         if (flagEl) flagEl.value = '1';
-        if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">GRATIS (−S/ ${lista})</span>`;
-        if (precioOrig) { precioOrig.value = 0; actualizarPrecioItem(i); }
+        // Zerizar total_item internamente SIN tocar el campo visible precio_orig
+        if (hidden) hidden.value = '0';
+        if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">✓ GRATIS — precio de lista S/ ${lista}</span>`;
+        actualizarResumen();
+        autoRellenarPorPago();
     } else {
         if (flagEl) flagEl.value = '0';
         if (dc)  dc.value = '';
         if (res) res.innerHTML = '';
-        if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
+        // Restaurar total_item al precio real
+        actualizarPrecioItem(i);
     }
 }
 
@@ -1376,6 +1381,15 @@ function actualizarPrecioItem(idx) {
     const tc         = parseFloat(document.getElementById(`tc_item_${idx}`)?.value || 0);
     const equivEl    = document.getElementById(`equiv-${idx}`);
     const hidden     = document.getElementById(`total_item_${idx}`);
+    const esGratis   = document.getElementById(`es_gratis_flag_${idx}`)?.value === '1';
+
+    // Si está marcado como gratis, total_item siempre es 0 sin importar el precio visible
+    if (esGratis) {
+        if (hidden) hidden.value = '0';
+        actualizarResumen();
+        autoRellenarPorPago();
+        return;
+    }
 
     let precioSoles;
     if (moneda === 'Soles') {
