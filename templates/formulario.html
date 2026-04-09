@@ -1790,77 +1790,91 @@ function metodosPago(c) {
 }
 
 function renderVistaItem(data) {
-    // Agrupar ventas por COD_ITEM
     let html = '';
+
     data.ventas.forEach(v => {
-        const cod      = v.COD_ITEM || '';
-        const total    = parseFloat(v['TOTAL S/ (PEN)'] || v['TOTAL'] || 0);
-        const debe     = parseFloat(v.DEBE || 0);
-        const cobrado  = total - debe;
-        const zona     = v['ZONA/CANTIDAD/ENVASE'] ? `<span style="color:#aaa;font-size:11px;"> · ${v['ZONA/CANTIDAD/ENVASE']}</span>` : '';
+        const cod        = v.COD_ITEM || '';
+        const total      = parseFloat(v['TOTAL S/ (PEN)'] || v['TOTAL'] || 0);
+        const debe       = parseFloat(v.DEBE || 0);
         const cobrosItem = cod ? data.cobros.filter(c => c.COD_ITEM === cod) : [];
-        const tipo     = v.TIPO || '';
-        const tipoBadge = tipo ? `<span style="font-size:10px;color:#fff;background:${tipo==='Producto'?'#2980B9':'#8E44AD'};border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:middle;">${tipo}</span>` : '';
+        const totalCobrado = cobrosItem.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+        const tipo       = v.TIPO || '';
+        const zona       = v['ZONA/CANTIDAD/ENVASE'] || '';
+        const badgeColor = tipo === 'Producto' ? '#2980B9' : '#8E44AD';
+        const badgeHtml  = tipo
+            ? `<span style="font-size:10px;color:#fff;background:${badgeColor};border-radius:4px;padding:2px 7px;margin-right:6px;">${tipo}</span>`
+            : '';
 
-        // Estado
-        let estadoHtml = '';
-        if (debe < 0.5) {
-            estadoHtml = `<span style="color:#27ae60;font-size:12px;font-weight:bold;">Pagado</span>`;
-        } else {
-            estadoHtml = `<span style="color:#C0392B;font-size:12px;font-weight:bold;">Debe S/ ${Math.round(debe)}</span>`;
-        }
+        // Estado en footer
+        const estadoHtml = debe < 0.5
+            ? `<span style="color:#27ae60;font-weight:bold;font-size:12px;">Pagado ✓</span>`
+            : `<span style="color:#C0392B;font-weight:bold;font-size:12px;">Debe S/ ${Math.round(debe)}</span>`;
 
-        html += `<div class="dia-block">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                <div>
-                    <div style="font-weight:bold;font-size:14px;color:#333;">${tipoBadge}${v.CATEGORIA || v.TIPO || '—'}${zona}</div>
-                    <div style="font-size:11px;color:#aaa;margin-top:3px;">Vendido: ${v.FECHA || '—'}${cod ? `<span style="margin-left:8px;opacity:0.5;">${cod}</span>` : ''}</div>
-                </div>
-                <div style="text-align:right;flex-shrink:0;">
-                    <div style="font-size:15px;font-weight:bold;color:#333;">S/ ${Math.round(total)}</div>
-                    ${estadoHtml}
-                </div>
-            </div>`;
+        html += `<div class="dia-block">`;
 
+        // ── Cabecera: badge + nombre + cod ────────────────────────────────
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div>${badgeHtml}<strong style="font-size:14px;color:#333;">${v.CATEGORIA || tipo || '—'}</strong></div>
+            ${cod ? `<span class="dia-cod">${cod}</span>` : ''}
+        </div>`;
+
+        // ── Sección Vendido ───────────────────────────────────────────────
+        html += `<div class="dia-seccion-lbl">Vendido</div>`;
+        html += `<div class="dia-row">
+            <div class="dia-concepto">
+                ${v.FECHA || '—'}
+                ${zona ? `<br><small style="color:#aaa;">${zona}</small>` : ''}
+            </div>
+            <div class="dia-monto" style="flex-shrink:0;margin-left:8px;">S/ ${Math.round(total)}</div>
+        </div>`;
+
+        // ── Sección Cobros ────────────────────────────────────────────────
+        html += `<div class="dia-seccion-lbl cobro-lbl">Cobros recibidos</div>`;
         if (cobrosItem.length > 0) {
-            html += `<div class="dia-seccion-lbl cobro-lbl" style="margin-top:8px;">Cobros recibidos</div>`;
             cobrosItem.forEach(c => {
                 html += `<div class="dia-row">
                     <div class="dia-concepto">
-                        <span style="font-size:12px;color:#555;">${c.FECHA || '—'}</span>
+                        ${c.FECHA || '—'}
                         <br><small style="color:#888;">${metodosPago(c)}</small>
                     </div>
                     <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
                 </div>`;
             });
-        } else if (cobrado < 0.5) {
-            html += `<div style="font-size:12px;color:#aaa;padding:6px 0;">Sin cobros registrados aún.</div>`;
+        } else {
+            html += `<div style="font-size:12px;color:#bbb;padding:5px 0;">Sin cobros registrados aún.</div>`;
         }
+
+        // ── Footer: vendido | cobrado | estado ────────────────────────────
+        html += `<div class="dia-footer">
+            <span style="color:#888;">Vendido: <strong>S/ ${Math.round(total)}</strong></span>
+            <span style="color:#27ae60;">Cobrado: <strong>S/ ${Math.round(totalCobrado)}</strong></span>
+            ${estadoHtml}
+        </div>`;
 
         html += `</div>`;
     });
 
-    // Créditos / adelantos sin COD_ITEM
+    // ── Créditos / pagos sin ítem asignado ───────────────────────────────
     const creditos = data.cobros.filter(c => !c.COD_ITEM || c.COD_ITEM === '');
     if (creditos.length > 0) {
         const totalCreditos = creditos.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
         html += `<div class="dia-block" style="border-left:3px solid #f0d060;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <div>
-                    <div style="font-weight:bold;font-size:14px;color:#856404;">Créditos a favor</div>
+                    <strong style="font-size:14px;color:#856404;">Créditos a favor</strong>
                     <div style="font-size:11px;color:#aaa;margin-top:2px;">Pagos sin servicio asignado</div>
                 </div>
-                <div style="font-size:15px;font-weight:bold;color:#856404;">S/ ${Math.round(totalCreditos)}</div>
+                <span class="dia-monto cobro">+S/ ${Math.round(totalCreditos)}</span>
             </div>`;
+        html += `<div class="dia-seccion-lbl cobro-lbl">Detalle</div>`;
         creditos.forEach(c => {
-            const cat = c.CATEGORIA || '';
-            const nota = cat.replace(/^CRÉDITO:?\s*/i,'').replace(/^ANTICIPO:?\s*/i,'').trim();
-            const metodo = metodosPago(c);
-            html += `<div class="dia-row" style="margin-top:6px;">
+            const cat   = c.CATEGORIA || '';
+            const nota  = cat.replace(/^CRÉDITO:?\s*/i,'').replace(/^ANTICIPO:?\s*/i,'').trim();
+            html += `<div class="dia-row">
                 <div class="dia-concepto">
-                    <span style="font-size:12px;color:#555;">${c.FECHA || '—'}</span>
-                    ${nota ? `<span style="font-size:11px;color:#888;margin-left:6px;">· ${nota}</span>` : ''}
-                    <br><small style="color:#aaa;">${metodo}</small>
+                    ${c.FECHA || '—'}
+                    ${nota ? `<br><small style="color:#888;">${nota}</small>` : ''}
+                    <br><small style="color:#aaa;">${metodosPago(c)}</small>
                 </div>
                 <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
             </div>`;
