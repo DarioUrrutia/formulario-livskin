@@ -258,6 +258,23 @@ def guardar_venta():
                 "cod_item": cod_item,
             })
 
+        # Normalizar: si el total distribuido supera lo pagado hoy, recortar proporcionalmente
+        total_distribuido = sum(it["pago"] for it in items_prep)
+        if total_distribuido > total_pagado_hoy + 0.5:
+            factor = total_pagado_hoy / total_distribuido if total_distribuido else 0
+            acumulado = 0.0
+            for it in items_prep:
+                it["pago"] = min(round(it["pago"] * factor), it["precio"])
+                acumulado += it["pago"]
+                it["debe"] = max(0.0, it["precio"] - it["pago"])
+            # Ajustar centavos residuales al último ítem con pago
+            diff = total_pagado_hoy - acumulado
+            for it in reversed(items_prep):
+                if it["pago"] > 0:
+                    it["pago"] = max(0, it["pago"] + round(diff))
+                    it["debe"] = max(0.0, it["precio"] - it["pago"])
+                    break
+
         # ── Fase 2: guardar en Ventas ─────────────────────────────────────────
         for idx, item in enumerate(items_prep):
             ef = efectivo if idx == 0 else ""

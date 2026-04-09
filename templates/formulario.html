@@ -1300,21 +1300,27 @@ function actualizarDistribucion() {
         }
     }
 
-    // Cap cada ítem a su precio y sumar lo distribuido
+    // Calcular saldoFavor y disponible antes del loop
+    const saldoFavor  = Math.max(0, pagadoHoy - totalSoles);
+    const disponible  = Math.max(0, pagadoHoy - saldoFavor); // lo que se puede distribuir
+
+    // Cap doble por ítem: 1) precio del ítem  2) dinero disponible acumulado
     let distribuido = 0;
     items.forEach(it => {
         const inputEl = document.getElementById(`pago_item_${it.idx}`);
         if (!inputEl) return;
         let v = parseFloat(inputEl.value || 0);
-        if (v > it.precioSoles) {          // nunca más del precio del ítem
-            v = it.precioSoles;
-            inputEl.value = v || '';
+        // Cap 1: nunca más del precio del ítem
+        v = Math.min(v, it.precioSoles);
+        // Cap 2: nunca más de lo que queda por distribuir
+        const maxParaEste = Math.max(0, disponible - distribuido);
+        v = Math.min(v, maxParaEste);
+        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
+            inputEl.value = v > 0 ? Math.round(v) : '';
             pagosPorItem[it.idx] = v;
         }
         distribuido += v;
     });
-
-    const saldoFavor = Math.max(0, pagadoHoy - totalSoles);
     const porAsignar = pagadoHoy - saldoFavor - distribuido;  // puede ser negativo → error
     const saldoPend  = totalSoles - pagadoHoy;
 
