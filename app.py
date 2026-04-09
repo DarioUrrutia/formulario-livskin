@@ -5,11 +5,33 @@ from collections import defaultdict
 from datetime import datetime, date
 import os
 import json
+import time
 
 app = Flask(__name__)
 app.secret_key = "livskin2024"
 
 SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
+
+# ── Caché en memoria (por proceso gunicorn) ───────────────────────────────────
+_gspread_client_cache = None
+_spreadsheet_cache    = None
+_worksheets_cache     = {}
+_data_cache           = {}          # {key: {"data": [...], "ts": float}}
+_CACHE_TTL            = 90          # segundos antes de refrescar lecturas
+
+def _get_cached_values(ws, key):
+    """Retorna get_all_values() desde caché si no ha expirado."""
+    now = time.time()
+    entry = _data_cache.get(key)
+    if entry and (now - entry["ts"]) < _CACHE_TTL:
+        return entry["data"]
+    data = ws.get_all_values()
+    _data_cache[key] = {"data": data, "ts": now}
+    return data
+
+def _invalidate_cache():
+    """Llamar después de cualquier escritura en Sheets."""
+    _data_cache.clear()
 
 ENCABEZADOS_VENTAS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
@@ -31,6 +53,9 @@ ENCABEZADOS_CLIENTES = [
 ]
 
 def get_gspread_client():
+    global _gspread_client_cache
+    if _gspread_client_cache is not None:
+        return _gspread_client_cache
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
@@ -43,7 +68,8 @@ def get_gspread_client():
         creds = Credentials.from_service_account_file(
             "livskin-formulario-56d6d2a0eac6.json", scopes=scopes
         )
-    return gspread.authorize(creds)
+    _gspread_client_cache = gspread.authorize(creds)
+    return _gspread_client_cache
 
 def get_or_create_worksheet(spreadsheet, nombre, encabezados):
     try:
@@ -54,13 +80,21 @@ def get_or_create_worksheet(spreadsheet, nombre, encabezados):
     return ws
 
 def get_sheets():
+    global _spreadsheet_cache, _worksheets_cache
     client = get_gspread_client()
-    spreadsheet = client.open_by_key(SHEET_ID)
-    ventas   = get_or_create_worksheet(spreadsheet, "Ventas",   ENCABEZADOS_VENTAS)
-    gastos   = get_or_create_worksheet(spreadsheet, "Gastos",   ENCABEZADOS_GASTOS)
-    cobros   = get_or_create_worksheet(spreadsheet, "Cobros",   ENCABEZADOS_COBROS)
-    clientes = get_or_create_worksheet(spreadsheet, "Clientes", ENCABEZADOS_CLIENTES)
-    return ventas, gastos, cobros, clientes
+    if _spreadsheet_cache is None:
+        _spreadsheet_cache = client.open_by_key(SHEET_ID)
+    spreadsheet = _spreadsheet_cache
+    if "ventas" not in _worksheets_cache:
+        _worksheets_cache["ventas"]   = get_or_create_worksheet(spreadsheet, "Ventas",   ENCABEZADOS_VENTAS)
+    if "gastos" not in _worksheets_cache:
+        _worksheets_cache["gastos"]   = get_or_create_worksheet(spreadsheet, "Gastos",   ENCABEZADOS_GASTOS)
+    if "cobros" not in _worksheets_cache:
+        _worksheets_cache["cobros"]   = get_or_create_worksheet(spreadsheet, "Cobros",   ENCABEZADOS_COBROS)
+    if "clientes" not in _worksheets_cache:
+        _worksheets_cache["clientes"] = get_or_create_worksheet(spreadsheet, "Clientes", ENCABEZADOS_CLIENTES)
+    return (_worksheets_cache["ventas"], _worksheets_cache["gastos"],
+            _worksheets_cache["cobros"], _worksheets_cache["clientes"])
 
 def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos="", email=""):
     """Retorna el código del cliente, creándolo si no existe."""
@@ -380,6 +414,7 @@ def guardar_venta():
             msg = f"Venta guardada ({len(items_prep)} ítem(s)) — Cliente: {cod_cliente}"
             if saldo > 0:
                 msg += f" — Saldo pendiente: S/ {saldo}"
+            _invalidate_cache()
             flash(msg)
         else:
             flash("No se ingresó ningún servicio.")
@@ -405,6 +440,7 @@ def guardar_gasto():
             request.form.get("metodo_pago_gasto", ""),
         ]
         gastos.append_row(datos)
+        _invalidate_cache()
         flash("Gasto guardado correctamente.")
     except Exception as e:
         flash(f"Error al guardar: {e}")
@@ -461,6 +497,7 @@ def guardar_cobro():
             filas_guardadas += 1
 
         if filas_guardadas > 0:
+            _invalidate_cache()
             flash(f"Cobro registrado correctamente ({filas_guardadas} ítem(s)).")
         else:
             flash("No se ingresó ningún monto válido.")
@@ -479,8 +516,8 @@ def ver_cliente():
 
     ventas_ws, _, cobros_ws, _ = get_sheets()
 
-    # Ventas del cliente — suma TOTAL (índice 12), no DEBE
-    todas_ventas = ventas_ws.get_all_values()
+    # Ventas del cliente — usa caché para no releer la hoja en cada keystroke
+    todas_ventas = _get_cached_values(ventas_ws, "ventas")
     ventas_cliente = []
     facturado_total = 0.0
     if len(todas_ventas) > 1:
@@ -493,8 +530,8 @@ def ver_cliente():
                 except (ValueError, IndexError):
                     pass
 
-    # Cobros del cliente — suma MONTO (índice 4)
-    todos_cobros = cobros_ws.get_all_values()
+    # Cobros del cliente — usa caché
+    todos_cobros = _get_cached_values(cobros_ws, "cobros")
     cobros_cliente = []
     cobrado_total = 0.0
     if len(todos_cobros) > 1:
@@ -583,9 +620,9 @@ def api_dashboard():
     hasta = parse_fecha(hasta_str)
 
     ventas_ws, gastos_ws, cobros_ws, _ = get_sheets()
-    todos       = ventas_ws.get_all_values()
-    todos_gasto = gastos_ws.get_all_values()
-    todos_cobros = cobros_ws.get_all_values()
+    todos        = _get_cached_values(ventas_ws,  "ventas")
+    todos_gasto  = _get_cached_values(gastos_ws,  "gastos")
+    todos_cobros = _get_cached_values(cobros_ws,  "cobros")
 
     if len(todos) < 2:
         return jsonify({"sin_datos": True})
@@ -798,6 +835,11 @@ def api_dashboard():
         "cobros_ef_giro":     round(cobros_ef_giro, 2),
         "cobros_recientes":   cobros_recientes_out,
     })
+
+@app.route("/ping")
+def ping():
+    """Keep-alive para evitar cold start en Render free tier."""
+    return "ok", 200
 
 if __name__ == "__main__":
     app.run(debug=True)
