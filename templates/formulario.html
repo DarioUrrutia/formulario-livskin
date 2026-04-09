@@ -1169,37 +1169,26 @@ function agregarItem() {
         <!-- Sección de promoción / descuento -->
         <input type="hidden" name="precio_lista_${i}" id="precio_lista_${i}" value="">
         <input type="hidden" name="descuento_${i}"    id="descuento_${i}"    value="">
-        <div style="background:#fff8f8;border:1px dashed #e8a0a0;border-radius:8px;padding:10px 12px;margin-top:4px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                <input type="checkbox" id="tiene_promo_${i}" onchange="togglePromo(${i})"
-                       style="width:15px;height:15px;accent-color:#C0392B;">
-                <label for="tiene_promo_${i}" style="font-size:12px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;">
-                    ¿Tiene promoción / descuento?
-                </label>
-            </div>
-            <div id="promo-campos-${i}" style="display:none;">
-                <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
-                    <!-- Opción Gratis -->
-                    <div style="display:flex;align-items:center;gap:6px;padding-bottom:10px;">
-                        <input type="checkbox" id="es_gratis_${i}" onchange="marcarGratis(${i})"
-                               style="width:16px;height:16px;accent-color:#C0392B;flex-shrink:0;">
-                        <label for="es_gratis_${i}" style="font-size:13px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;white-space:nowrap;">
-                            Gratis
-                        </label>
-                    </div>
-                    <!-- Separador -->
-                    <div style="font-size:12px;color:#ccc;padding-bottom:12px;">|</div>
-                    <!-- Descuento -->
-                    <div class="field" style="margin:0;flex:1;min-width:120px;">
-                        <label style="font-size:11px;">Descuento S/</label>
-                        <input type="number" id="descuento_input_${i}"
-                               placeholder="0" step="1" min="0"
-                               oninput="calcularDescuento(${i})"
-                               style="width:100%;box-sizing:border-box;">
-                    </div>
-                </div>
-                <div id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;margin-top:4px;font-weight:bold;"></div>
-            </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px;padding:8px 10px;background:#fff8f8;border:1px dashed #e8a0a0;border-radius:8px;">
+            <!-- Gratis -->
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="es_gratis_${i}" onchange="marcarGratis(${i})"
+                       style="width:16px;height:16px;accent-color:#C0392B;flex-shrink:0;">
+                <span style="font-size:13px;color:#C0392B;font-weight:bold;">Gratis</span>
+            </label>
+            <!-- Separador -->
+            <span style="color:#ddd;font-size:16px;">|</span>
+            <!-- Descuento -->
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="tiene_desc_${i}" onchange="toggleDescuento(${i})"
+                       style="width:16px;height:16px;accent-color:#C0392B;flex-shrink:0;">
+                <span style="font-size:13px;color:#C0392B;font-weight:bold;">Descuento S/</span>
+            </label>
+            <input type="number" id="descuento_input_${i}"
+                   placeholder="0" step="1" min="0"
+                   oninput="calcularDescuento(${i})"
+                   style="width:90px;padding:7px 8px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;display:none;">
+            <span id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;font-weight:bold;"></span>
         </div>
     `;
     container.appendChild(div);
@@ -1214,45 +1203,71 @@ function eliminarItem(i) {
     actualizarResumen();
 }
 
-function togglePromo(i) {
-    const show = document.getElementById(`tiene_promo_${i}`).checked;
-    const campos = document.getElementById(`promo-campos-${i}`);
-    if (campos) campos.style.display = show ? 'block' : 'none';
-    if (show) {
-        // Capturar precio de lista = precio de venta actual
-        const totalHidden = document.getElementById(`total_item_${i}`);
-        const pl = document.getElementById(`precio_lista_${i}`);
-        if (pl && totalHidden) pl.value = totalHidden.value || 0;
+// Captura el precio de lista cuando el usuario interactúa con los checkboxes de promo
+function capturarPrecioLista(i) {
+    const pl = document.getElementById(`precio_lista_${i}`);
+    const totalHidden = document.getElementById(`total_item_${i}`);
+    if (pl && totalHidden && !parseFloat(pl.value)) {
+        pl.value = totalHidden.value || 0;
+    }
+}
+
+function marcarGratis(i) {
+    capturarPrecioLista(i);
+    const checked = document.getElementById(`es_gratis_${i}`).checked;
+    const pl      = document.getElementById(`precio_lista_${i}`);
+    const lista   = parseFloat(pl?.value || 0);
+    const dc      = document.getElementById(`descuento_${i}`);
+    const res     = document.getElementById(`promo-resumen-${i}`);
+    const precioOrig = document.getElementById(`precio_orig_${i}`);
+    const tieneDesc  = document.getElementById(`tiene_desc_${i}`);
+    const dcInput    = document.getElementById(`descuento_input_${i}`);
+
+    if (checked) {
+        // Desmarcar "Descuento" y ocultar su input
+        if (tieneDesc) tieneDesc.checked = false;
+        if (dcInput)   { dcInput.style.display = 'none'; dcInput.value = ''; }
+        if (dc)  dc.value = lista;
+        if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">GRATIS (−S/ ${lista})</span>`;
+        if (precioOrig) { precioOrig.value = 0; actualizarPrecioItem(i); }
     } else {
-        // Restaurar precio de venta al precio de lista original
-        const pl = document.getElementById(`precio_lista_${i}`);
-        const lista = parseFloat(pl?.value || 0);
-        if (lista > 0) {
-            const precioOrig = document.getElementById(`precio_orig_${i}`);
-            if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
-        }
-        // Limpiar hidden fields de descuento
-        const dc = document.getElementById(`descuento_${i}`);
-        const dcInput = document.getElementById(`descuento_input_${i}`);
-        const gratis = document.getElementById(`es_gratis_${i}`);
-        if (dc) dc.value = '';
-        if (dcInput) dcInput.value = '';
-        if (gratis) gratis.checked = false;
-        const res = document.getElementById(`promo-resumen-${i}`);
+        if (dc)  dc.value = '';
         if (res) res.innerHTML = '';
+        if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
+    }
+}
+
+function toggleDescuento(i) {
+    capturarPrecioLista(i);
+    const checked = document.getElementById(`tiene_desc_${i}`).checked;
+    const dcInput = document.getElementById(`descuento_input_${i}`);
+    const gratis  = document.getElementById(`es_gratis_${i}`);
+    const dc      = document.getElementById(`descuento_${i}`);
+    const res     = document.getElementById(`promo-resumen-${i}`);
+    const pl      = document.getElementById(`precio_lista_${i}`);
+    const precioOrig = document.getElementById(`precio_orig_${i}`);
+
+    if (checked) {
+        // Desmarcar "Gratis"
+        if (gratis) gratis.checked = false;
+        if (dcInput) { dcInput.style.display = 'inline-block'; dcInput.focus(); }
+    } else {
+        if (dcInput) { dcInput.style.display = 'none'; dcInput.value = ''; }
+        if (dc)  dc.value = '';
+        if (res) res.innerHTML = '';
+        // Restaurar precio original
+        const lista = parseFloat(pl?.value || 0);
+        if (lista > 0 && precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
     }
 }
 
 function calcularDescuento(i) {
-    const pl     = document.getElementById(`precio_lista_${i}`);
-    const lista  = parseFloat(pl?.value || 0);
+    const pl    = document.getElementById(`precio_lista_${i}`);
+    const lista = parseFloat(pl?.value || 0);
     const dcInput = document.getElementById(`descuento_input_${i}`);
-    const desc   = parseFloat(dcInput?.value || 0);
-    const dc     = document.getElementById(`descuento_${i}`);
-    const res    = document.getElementById(`promo-resumen-${i}`);
-    const gratis = document.getElementById(`es_gratis_${i}`);
-
-    if (gratis) gratis.checked = false;
+    const desc  = parseFloat(dcInput?.value || 0);
+    const dc    = document.getElementById(`descuento_${i}`);
+    const res   = document.getElementById(`promo-resumen-${i}`);
 
     const cobrado = Math.max(0, lista - desc);
     const pct = lista > 0 ? Math.round((desc / lista) * 100) : 0;
@@ -1260,36 +1275,11 @@ function calcularDescuento(i) {
     if (dc) dc.value = desc;
     if (res) {
         res.innerHTML = desc > 0
-            ? `Cliente paga: <strong>S/ ${cobrado}</strong> <span style="color:#888;">(−${pct}% de descuento)</span>`
+            ? `→ paga <strong>S/ ${cobrado}</strong> <span style="color:#888;">(−${pct}%)</span>`
             : '';
     }
-    // Actualizar precio de venta cobrado
     const precioOrig = document.getElementById(`precio_orig_${i}`);
     if (precioOrig) { precioOrig.value = cobrado; actualizarPrecioItem(i); }
-}
-
-function marcarGratis(i) {
-    const checked = document.getElementById(`es_gratis_${i}`).checked;
-    const pl     = document.getElementById(`precio_lista_${i}`);
-    const lista  = parseFloat(pl?.value || 0);
-    const dcInput = document.getElementById(`descuento_input_${i}`);
-    const dc     = document.getElementById(`descuento_${i}`);
-    const res    = document.getElementById(`promo-resumen-${i}`);
-    const precioOrig = document.getElementById(`precio_orig_${i}`);
-
-    if (checked) {
-        // Deshabilitar input de descuento
-        if (dcInput) { dcInput.value = ''; dcInput.disabled = true; dcInput.style.opacity = '0.4'; }
-        if (dc) dc.value = lista;
-        if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">GRATIS — descuento total S/ ${lista}</span>`;
-        if (precioOrig) { precioOrig.value = 0; actualizarPrecioItem(i); }
-    } else {
-        // Rehabilitar input de descuento
-        if (dcInput) { dcInput.disabled = false; dcInput.style.opacity = '1'; }
-        if (dc) dc.value = '';
-        if (res) res.innerHTML = '';
-        if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
-    }
 }
 
 function toggleOtroItem(sel, i) {
