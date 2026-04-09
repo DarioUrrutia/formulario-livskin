@@ -23,7 +23,7 @@ ENCABEZADOS_GASTOS = [
 
 ENCABEZADOS_COBROS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "MONTO", "EFECTIVO", "YAPE", "PLIN", "GIRO", "NOTAS",
-    "COD_ITEM", "CATEGORIA"
+    "COD_ITEM", "CATEGORIA", "COD_COBRO"
 ]
 
 ENCABEZADOS_CLIENTES = [
@@ -100,6 +100,18 @@ def get_next_item_code(tipo, maximos, contadores):
         prefix = "LIVTRAT"
     contadores[prefix] = contadores.get(prefix, maximos.get(prefix, 0)) + 1
     return f"{prefix}{contadores[prefix]:04d}"
+
+def get_max_cobro_num(cobros_ws):
+    """Lee la hoja Cobros UNA vez y retorna el máximo número de LIVCOBRO."""
+    todos = cobros_ws.get_all_values()
+    max_num = 0
+    for fila in todos[1:]:
+        if len(fila) > 12 and str(fila[12]).startswith("LIVCOBRO"):
+            try:
+                max_num = max(max_num, int(fila[12][8:]))
+            except ValueError:
+                pass
+    return max_num
 
 def siguiente_numero(sheet):
     todos = sheet.get_all_values()
@@ -263,8 +275,14 @@ def guardar_venta():
         # ── Fase 3: registrar en Cobros (uno por ítem pagado, relacional) ─────
         credito_aplicado = to_float(request.form.get("credito_aplicado", "0"))
         _, _, cobros, _ = get_sheets()
-        cobros_idx = 0
 
+        # Leer máximo COD_COBRO una sola vez y usar contador en memoria
+        cobro_num = [get_max_cobro_num(cobros)]
+        def next_cod_cobro():
+            cobro_num[0] += 1
+            return f"LIVCOBRO{cobro_num[0]:04d}"
+
+        cobros_idx = 0
         if total_pagado_hoy > 0:
             for item in items_prep:
                 if item["pago"] <= 0:
@@ -279,7 +297,7 @@ def guardar_venta():
                     round(item["pago"]),
                     ef_c, ya_c, pl_c, gi_c,
                     f"Pago venta {fecha}",
-                    item["cod_item"], item["categoria"]
+                    item["cod_item"], item["categoria"], next_cod_cobro()
                 ])
                 cobros_idx += 1
 
@@ -294,12 +312,11 @@ def guardar_venta():
                 round(credito_exceso),
                 "", "", "", "",
                 "Crédito generado por exceso de pago",
-                "", categoria_credito
+                "", categoria_credito, next_cod_cobro()
             ])
 
         # ── Fase 5: registrar crédito aplicado (vinculado al ítem) ───────────
         if credito_aplicado > 0 and items_prep:
-            # Distribuir el crédito proporcionalmente entre los ítems
             total_items = sum(it["precio"] for it in items_prep) or 1
             credito_restante = credito_aplicado
             for idx, item in enumerate(items_prep):
@@ -318,7 +335,7 @@ def guardar_venta():
                     credito_item,
                     "", "", "", "",
                     "Crédito aplicado",
-                    item["cod_item"], item["categoria"]
+                    item["cod_item"], item["categoria"], next_cod_cobro()
                 ])
 
         if items_prep:
@@ -383,11 +400,16 @@ def guardar_cobro():
             montos     = [request.form.get("monto_cobro", "")]
             categorias = [request.form.get("categoria_cobro", "")]
 
+        # Contador en memoria para evitar duplicados dentro de la misma solicitud
+        cobro_num = [get_max_cobro_num(cobros)]
+        def next_cod_cobro():
+            cobro_num[0] += 1
+            return f"LIVCOBRO{cobro_num[0]:04d}"
+
         filas_guardadas = 0
         for idx, (cod, monto, cat) in enumerate(zip(cod_items, montos, categorias)):
             if not monto or float(monto or 0) <= 0:
                 continue
-            # Métodos de pago solo en la primera fila
             ef = efectivo if idx == 0 else ""
             ya = yape     if idx == 0 else ""
             pl = plin     if idx == 0 else ""
@@ -397,7 +419,7 @@ def guardar_cobro():
                 num, fecha, cod_cliente, nombre_cobro,
                 round(float(monto)),
                 ef, ya, pl, gi,
-                notas, cod, cat
+                notas, cod, cat, next_cod_cobro()
             ])
             filas_guardadas += 1
 
