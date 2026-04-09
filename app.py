@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import gspread
 from google.oauth2.service_account import Credentials
 from collections import defaultdict
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import json
 import time
@@ -781,6 +781,154 @@ def api_dashboard():
         for f in recientes
     ]
 
+    # ── Datos globales (sin filtro de fecha) para comparativas y aging ────────
+    today = date.today()
+    mes_actual_str = today.strftime("%Y-%m")
+    mes_ant_date   = (today.replace(day=1) - timedelta(days=1))
+    mes_ant_str    = mes_ant_date.strftime("%Y-%m")
+    año_actual     = today.year
+    año_anterior   = today.year - 1
+
+    # Construir todas_filas sin filtro de fecha
+    todas_filas = []
+    for row in todos[1:]:
+        if not any(row):
+            continue
+        def g_all(i, r=row): return r[i].strip() if i < len(r) else ""
+        f_date = parse_fecha(g_all(1))
+        if not f_date:
+            continue
+        t2  = parse_num(g_all(12))
+        c2  = g_all(6)
+        co2 = min(cobros_por_item.get(c2, 0.0) if c2 else 0.0, t2)
+        d2  = max(0.0, t2 - co2)
+        todas_filas.append({
+            "fecha": f_date, "cliente": g_all(3), "tipo": g_all(5),
+            "cod_item": c2, "categoria": g_all(7), "total": t2,
+            "cobrado": co2, "debe": d2,
+        })
+
+    def _sum(lst, key="total"):
+        return sum(f[key] for f in lst)
+
+    filas_mes_act = [f for f in todas_filas if f["fecha"].strftime("%Y-%m") == mes_actual_str]
+    filas_mes_ant = [f for f in todas_filas if f["fecha"].strftime("%Y-%m") == mes_ant_str]
+    filas_año_act = [f for f in todas_filas if f["fecha"].year == año_actual]
+    filas_año_ant = [f for f in todas_filas if f["fecha"].year == año_anterior]
+
+    def delta_pct(actual, anterior):
+        if anterior < 0.5: return None
+        return round((actual - anterior) / anterior * 100, 1)
+
+    # Totales comparativos
+    tot_mes_act = _sum(filas_mes_act)
+    tot_mes_ant = _sum(filas_mes_ant)
+    tot_año_act = _sum(filas_año_act)
+    tot_año_ant = _sum(filas_año_ant)
+
+    # Por tipo: mes actual vs anterior (para General)
+    def agg_tipo_mes(lst):
+        d = defaultdict(float)
+        for f in lst:
+            t = f["tipo"]
+            k = "Tratamiento" if t in ("Tratamiento","Certificado") else ("Producto" if t == "Producto" else "Otro")
+            d[k] += f["total"]
+        return d
+
+    tipo_mes_act = agg_tipo_mes(filas_mes_act)
+    tipo_mes_ant = agg_tipo_mes(filas_mes_ant)
+
+    # Por categoría: mes actual (top 5)
+    cats_mes_act = defaultdict(float)
+    for f in filas_mes_act:
+        if f["categoria"] and f["tipo"] != "Promoción":
+            cats_mes_act[f["categoria"]] += f["total"]
+    top_cats_mes = sorted(
+        [{"cat": k, "total": round(v, 2)} for k, v in cats_mes_act.items()],
+        key=lambda x: x["total"], reverse=True
+    )[:8]
+
+    # ── Top 20% clientes del período con evolución ────────────────────────────
+    clientes_ev = defaultdict(lambda: {
+        "total": 0.0, "visitas": 0, "cats": defaultdict(float), "debe": 0.0
+    })
+    for f in filas:
+        if f["cliente"]:
+            clientes_ev[f["cliente"]]["total"]   += f["total"]
+            clientes_ev[f["cliente"]]["visitas"] += 1
+            clientes_ev[f["cliente"]]["debe"]    += f["debe"]
+            if f["categoria"]:
+                clientes_ev[f["cliente"]]["cats"][f["categoria"]] += f["total"]
+
+    sorted_ev = sorted(clientes_ev.items(), key=lambda x: x[1]["total"], reverse=True)
+    top20_n = max(1, int(len(sorted_ev) * 0.2))
+
+    # Revenue por cliente en mes actual y anterior (de todas_filas)
+    cl_mes_act = defaultdict(float)
+    cl_mes_ant = defaultdict(float)
+    for f in filas_mes_act:
+        if f["cliente"]: cl_mes_act[f["cliente"]] += f["total"]
+    for f in filas_mes_ant:
+        if f["cliente"]: cl_mes_ant[f["cliente"]] += f["total"]
+
+    # Duración del período en meses para frecuencia
+    if desde and hasta:
+        meses_periodo = max(1, round((hasta - desde).days / 30, 1))
+    else:
+        meses_periodo = 1
+
+    top20_out = []
+    for nombre, data in sorted_ev[:top20_n]:
+        cat_p = max(data["cats"], key=data["cats"].get) if data["cats"] else "—"
+        ma = round(cl_mes_act.get(nombre, 0), 2)
+        mant = round(cl_mes_ant.get(nombre, 0), 2)
+        if ma > mant * 1.05:    tendencia = "up"
+        elif ma < mant * 0.95:  tendencia = "down"
+        else:                    tendencia = "stable"
+        top20_out.append({
+            "cliente":     nombre,
+            "total":       round(data["total"], 2),
+            "visitas":     data["visitas"],
+            "frecuencia":  round(data["visitas"] / meses_periodo, 1),
+            "cat_principal": cat_p,
+            "mes_actual":  ma,
+            "mes_anterior": mant,
+            "tendencia":   tendencia,
+            "debe":        round(data["debe"], 2),
+        })
+
+    # ── Deudores por antigüedad (todas las ventas) ────────────────────────────
+    def aging_bucket(days):
+        if days < 30:  return "menos_30"
+        if days < 60:  return "30_60"
+        if days < 90:  return "60_90"
+        return "mas_90"
+
+    aging_init = lambda: {"total": 0.0, "count": 0, "items": []}
+    deudores_aging = {k: aging_init() for k in ("menos_30","30_60","60_90","mas_90")}
+
+    for f in todas_filas:
+        if f["debe"] < 0.5 or not f["cod_item"]:
+            continue
+        days = (today - f["fecha"]).days
+        bk = aging_bucket(days)
+        deudores_aging[bk]["total"] += f["debe"]
+        deudores_aging[bk]["count"] += 1
+        if len(deudores_aging[bk]["items"]) < 15:
+            deudores_aging[bk]["items"].append({
+                "cliente":  f["cliente"],
+                "categoria": f["categoria"],
+                "debe":     round(f["debe"], 2),
+                "fecha":    f["fecha"].strftime("%d/%m/%Y"),
+                "dias":     days,
+            })
+
+    for bk in deudores_aging:
+        deudores_aging[bk]["total"] = round(deudores_aging[bk]["total"], 2)
+
+    # ── Pendientes de cobro para tab Cobros (mismo aging) ────────────────────
+    pendientes_cobro = deudores_aging  # mismo cálculo, mismo origen
+
     # ── Cobros: recientes ─────────────────────────────────────────────────────
     # ef_* ya calculados arriba desde cobros_list, reutilizamos
     cobros_ef_efectivo = ef_efectivo
@@ -834,6 +982,23 @@ def api_dashboard():
         "cobros_ef_plin":     round(cobros_ef_plin, 2),
         "cobros_ef_giro":     round(cobros_ef_giro, 2),
         "cobros_recientes":   cobros_recientes_out,
+        # Comparativas
+        "comp_mes_actual":    round(tot_mes_act, 2),
+        "comp_mes_anterior":  round(tot_mes_ant, 2),
+        "comp_mes_delta":     delta_pct(tot_mes_act, tot_mes_ant),
+        "comp_año_actual":    round(tot_año_act, 2),
+        "comp_año_anterior":  round(tot_año_ant, 2),
+        "comp_año_delta":     delta_pct(tot_año_act, tot_año_ant),
+        "tipo_mes_actual":    {k: round(v,2) for k,v in tipo_mes_act.items()},
+        "tipo_mes_anterior":  {k: round(v,2) for k,v in tipo_mes_ant.items()},
+        "top_cats_mes":       top_cats_mes,
+        "mes_actual_str":     mes_actual_str,
+        "mes_ant_str":        mes_ant_str,
+        # Clientes
+        "top20_clientes":     top20_out,
+        # Aging
+        "deudores_aging":     deudores_aging,
+        "pendientes_cobro":   pendientes_cobro,
     })
 
 @app.route("/ping")

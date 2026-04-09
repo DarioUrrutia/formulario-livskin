@@ -597,7 +597,7 @@
             <!-- ─── PANEL: GENERAL ─────────────────────────────────── -->
             <div id="dash-panel-general" class="dash-panel">
 
-                <div class="kpi-seccion">Financiero</div>
+                <div class="kpi-seccion">Período seleccionado</div>
                 <div class="kpi-grid kpi-3">
                     <div class="kpi-card">
                         <div class="kpi-label">Total Facturado</div>
@@ -624,6 +624,35 @@
                         <div class="kpi-valor" id="kpi-balance">—</div>
                         <div class="kpi-sub" id="kpi-gastos-sub">—</div>
                     </div>
+                </div>
+
+                <div class="kpi-seccion">Comparativas (siempre al día de hoy)</div>
+                <div class="kpi-grid kpi-2">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Mes actual</div>
+                        <div class="kpi-valor" id="comp-mes-act">—</div>
+                        <div class="kpi-sub" id="comp-mes-ant-lbl">—</div>
+                        <div style="margin-top:4px;" id="comp-mes-delta"></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Año actual</div>
+                        <div class="kpi-valor" id="comp-año-act">—</div>
+                        <div class="kpi-sub" id="comp-año-ant-lbl">—</div>
+                        <div style="margin-top:4px;" id="comp-año-delta"></div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Ventas por mes — cobrado vs pendiente</div>
+                    <canvas id="chart-meses" height="200"></canvas>
+                </div>
+
+                <div class="kpi-seccion">Por tipo — mes actual vs anterior</div>
+                <div id="tabla-tipo-mes"></div>
+
+                <div class="chart-card">
+                    <div class="chart-titulo">Top categorías este mes</div>
+                    <canvas id="chart-cats-mes" height="220"></canvas>
                 </div>
 
                 <div class="kpi-seccion">Operaciones</div>
@@ -655,12 +684,7 @@
                 </div>
 
                 <div class="chart-card">
-                    <div class="chart-titulo">Ventas por mes — cobrado vs pendiente</div>
-                    <canvas id="chart-meses" height="200"></canvas>
-                </div>
-
-                <div class="chart-card">
-                    <div class="chart-titulo">Mix de ventas (Tratamientos / Productos)</div>
+                    <div class="chart-titulo">Mix de ventas — período seleccionado</div>
                     <canvas id="chart-mix" height="180"></canvas>
                 </div>
 
@@ -674,22 +698,29 @@
             <!-- ─── PANEL: CLIENTES ───────────────────────────────── -->
             <div id="dash-panel-clientes" class="dash-panel" style="display:none;">
 
-                <div class="kpi-seccion">Top clientes</div>
-
+                <div class="kpi-seccion">Top 20% clientes del período</div>
+                <div style="font-size:11px;color:#aaa;margin-bottom:8px;">
+                    Evolución: comparativa mes actual vs mes anterior
+                </div>
                 <div class="chart-card">
-                    <div class="chart-titulo">Top 10 clientes por facturación</div>
-                    <canvas id="chart-clientes" height="280"></canvas>
+                    <div id="tabla-top20"></div>
                 </div>
 
                 <div class="chart-card">
-                    <div class="chart-titulo">Detalle top clientes</div>
-                    <div id="tabla-top-clientes"></div>
+                    <div class="chart-titulo">Top clientes por facturación</div>
+                    <canvas id="chart-clientes" height="260"></canvas>
                 </div>
 
                 <div class="chart-card">
-                    <div class="chart-titulo">Top 10 categorías / tratamientos</div>
-                    <canvas id="chart-cats" height="280"></canvas>
+                    <div class="chart-titulo">Top categorías — período seleccionado</div>
+                    <canvas id="chart-cats" height="260"></canvas>
                 </div>
+
+                <div class="kpi-seccion">Deudores por antigüedad</div>
+                <div style="font-size:11px;color:#aaa;margin-bottom:8px;">
+                    Ítems con saldo pendiente — calculado al día de hoy
+                </div>
+                <div id="tabla-deudores-aging"></div>
 
             </div><!-- /panel-clientes -->
 
@@ -737,6 +768,12 @@
                     <div class="chart-titulo">Cobros recientes</div>
                     <div id="tabla-cobros-recientes"></div>
                 </div>
+
+                <div class="kpi-seccion">Pendientes de cobro por antigüedad</div>
+                <div style="font-size:11px;color:#aaa;margin-bottom:8px;">
+                    Servicios vendidos con saldo sin cobrar — calculado al día de hoy
+                </div>
+                <div id="tabla-pendientes-cobro"></div>
 
             </div><!-- /panel-cobros -->
 
@@ -2066,6 +2103,26 @@ function cargarDashboard() {
         document.getElementById('kpi-prod').textContent       = fmt(d.total_productos);
         document.getElementById('kpi-gastos').textContent     = fmt(d.total_gastos);
 
+        // ── GENERAL: comparativas mes ──
+        function deltaChip(val) {
+            if (val === null || val === undefined) return '<span style="font-size:11px;color:#aaa;">Sin datos anteriores</span>';
+            const col = val >= 0 ? '#27ae60' : '#C0392B';
+            const arrow = val >= 0 ? '▲' : '▼';
+            return `<span style="font-size:13px;font-weight:bold;color:${col};">${arrow} ${Math.abs(val)}%</span> <span style="font-size:11px;color:#aaa;">vs mes ant.</span>`;
+        }
+        function deltaChipAño(val) {
+            if (val === null || val === undefined) return '<span style="font-size:11px;color:#aaa;">Sin datos año anterior</span>';
+            const col = val >= 0 ? '#27ae60' : '#C0392B';
+            const arrow = val >= 0 ? '▲' : '▼';
+            return `<span style="font-size:13px;font-weight:bold;color:${col};">${arrow} ${Math.abs(val)}%</span> <span style="font-size:11px;color:#aaa;">vs año ant.</span>`;
+        }
+        document.getElementById('comp-mes-act').textContent = fmt(d.comp_mes_actual);
+        document.getElementById('comp-mes-ant-lbl').textContent = 'Mes ant: ' + fmt(d.comp_mes_anterior);
+        document.getElementById('comp-mes-delta').innerHTML = deltaChip(d.comp_mes_delta);
+        document.getElementById('comp-año-act').textContent = fmt(d.comp_año_actual);
+        document.getElementById('comp-año-ant-lbl').textContent = 'Año ant: ' + fmt(d.comp_año_anterior);
+        document.getElementById('comp-año-delta').innerHTML = deltaChipAño(d.comp_año_delta);
+
         // ── GENERAL: ventas por mes (stacked) ──
         destroyChart('meses');
         charts['meses'] = new Chart(document.getElementById('chart-meses'), {
@@ -2076,6 +2133,37 @@ function cargarDashboard() {
             ]},
             options: { plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}} }
         });
+
+        // ── GENERAL: por tipo mes actual vs anterior ──
+        const tiposK = ['Tratamiento','Producto','Otro'];
+        const tiposLabel = ['Tratamientos','Productos','Otros'];
+        const tiposColores = ['#8E44AD','#2980B9','#7F8C8D'];
+        let htmlTipo = '<table class="tabla-rec"><thead><tr><th>Tipo</th><th>Mes actual</th><th>Mes anterior</th><th>Variación</th></tr></thead><tbody>';
+        tiposK.forEach((k, i) => {
+            const act = d.tipo_mes_actual[k] || 0;
+            const ant = d.tipo_mes_anterior[k] || 0;
+            if (act === 0 && ant === 0) return;
+            const varPct = ant > 0 ? ((act - ant) / ant * 100).toFixed(1) : null;
+            const varHtml = varPct === null ? '<span style="color:#aaa;">—</span>'
+                : `<span style="color:${parseFloat(varPct)>=0?'#27ae60':'#C0392B'};font-weight:bold;">${parseFloat(varPct)>=0?'▲':'▼'} ${Math.abs(varPct)}%</span>`;
+            htmlTipo += `<tr>
+                <td><span style="background:${tiposColores[i]};color:#fff;font-size:10px;padding:1px 6px;border-radius:4px;">${tiposLabel[i]}</span></td>
+                <td><strong>${fmt(act)}</strong></td>
+                <td style="color:#888;">${fmt(ant)}</td>
+                <td>${varHtml}</td>
+            </tr>`;
+        });
+        document.getElementById('tabla-tipo-mes').innerHTML = htmlTipo + '</tbody></table>';
+
+        // ── GENERAL: top categorías del mes ──
+        destroyChart('cats-mes');
+        if (d.top_cats_mes.length > 0) {
+            charts['cats-mes'] = new Chart(document.getElementById('chart-cats-mes'), {
+                type:'bar',
+                data:{ labels:d.top_cats_mes.map(x=>x.cat), datasets:[{ label:'S/', data:d.top_cats_mes.map(x=>x.total), backgroundColor:'#C0392B', borderRadius:4 }]},
+                options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
+            });
+        }
 
         // ── GENERAL: mix tratamientos/productos ──
         destroyChart('mix');
@@ -2093,20 +2181,41 @@ function cargarDashboard() {
         });
         document.getElementById('tabla-recientes').innerHTML = htmlR + '</tbody></table>';
 
+        // ── CLIENTES: top 20% tabla con evolución ──
+        let html20 = '<table class="tabla-rec"><thead><tr><th>#</th><th>Cliente</th><th>Facturado</th><th>Visitas</th><th>Frec./mes</th><th>Lo que más compra</th><th>Este mes</th><th>Mes ant.</th><th>Tendencia</th></tr></thead><tbody>';
+        if (d.top20_clientes.length === 0) {
+            html20 += '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:16px;">Sin datos en el período</td></tr>';
+        } else {
+            d.top20_clientes.forEach((c, i) => {
+                const tendIcon = c.tendencia === 'up'
+                    ? '<span style="color:#27ae60;font-size:16px;">▲</span>'
+                    : c.tendencia === 'down'
+                    ? '<span style="color:#C0392B;font-size:16px;">▼</span>'
+                    : '<span style="color:#aaa;font-size:16px;">—</span>';
+                const debeHtml = c.debe > 0 ? `<br><span class="debe-badge">${fmt(c.debe)}</span>` : '';
+                html20 += `<tr>
+                    <td style="color:#aaa;font-size:11px;">${i+1}</td>
+                    <td><strong>${c.cliente}</strong>${debeHtml}</td>
+                    <td>${fmt(c.total)}</td>
+                    <td style="text-align:center;">${c.visitas}</td>
+                    <td style="text-align:center;">${c.frecuencia}</td>
+                    <td style="font-size:11px;color:#666;">${c.cat_principal}</td>
+                    <td style="color:#27ae60;">${c.mes_actual > 0 ? fmt(c.mes_actual) : '—'}</td>
+                    <td style="color:#888;">${c.mes_anterior > 0 ? fmt(c.mes_anterior) : '—'}</td>
+                    <td style="text-align:center;">${tendIcon}</td>
+                </tr>`;
+            });
+        }
+        document.getElementById('tabla-top20').innerHTML = html20 + '</tbody></table>';
+
         // ── CLIENTES: top clientes chart ──
         destroyChart('clientes');
+        const topCl = d.top20_clientes.slice(0,10);
         charts['clientes'] = new Chart(document.getElementById('chart-clientes'), {
             type:'bar',
-            data:{ labels:d.top_clientes.map(x=>x.cliente), datasets:[{ label:'Facturado (S/)', data:d.top_clientes.map(x=>x.total), backgroundColor:COLORES, borderRadius:4 }]},
-            options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Visitas: '+d.top_clientes[ctx.dataIndex].visitas}}}, scales:{x:{beginAtZero:true}} }
+            data:{ labels:topCl.map(x=>x.cliente), datasets:[{ label:'Facturado (S/)', data:topCl.map(x=>x.total), backgroundColor:COLORES, borderRadius:4 }]},
+            options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
         });
-
-        // ── CLIENTES: tabla top clientes ──
-        let htmlTC='<table class="tabla-rec"><thead><tr><th>#</th><th>Cliente</th><th>Visitas</th><th>Facturado</th></tr></thead><tbody>';
-        d.top_clientes.forEach((c,i) => {
-            htmlTC+=`<tr><td style="color:#aaa;font-size:11px;">${i+1}</td><td>${c.cliente}</td><td style="text-align:center;">${c.visitas}</td><td>${fmt(c.total)}</td></tr>`;
-        });
-        document.getElementById('tabla-top-clientes').innerHTML = htmlTC + '</tbody></table>';
 
         // ── CLIENTES: top categorías ──
         destroyChart('cats');
@@ -2115,6 +2224,41 @@ function cargarDashboard() {
             data:{ labels:d.por_categoria.map(x=>x.categoria), datasets:[{ label:'Total (S/)', data:d.por_categoria.map(x=>x.total), backgroundColor:'#C0392B', borderRadius:4 }]},
             options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:ctx=>'  Veces: '+d.por_categoria[ctx.dataIndex].count}}}, scales:{x:{beginAtZero:true}} }
         });
+
+        // ── CLIENTES: deudores por antigüedad ──
+        function renderAging(aging, elId) {
+            const buckets = [
+                { key:'menos_30', label:'Menos de 1 mes',  color:'#e67e22' },
+                { key:'30_60',    label:'1 – 2 meses',     color:'#e74c3c' },
+                { key:'60_90',    label:'2 – 3 meses',     color:'#c0392b' },
+                { key:'mas_90',   label:'Más de 3 meses',  color:'#7b241c' },
+            ];
+            let html = '';
+            let hayDatos = false;
+            buckets.forEach(b => {
+                const data_b = aging[b.key];
+                if (!data_b || data_b.count === 0) return;
+                hayDatos = true;
+                html += `<div style="border-left:4px solid ${b.color};background:#fafafa;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-size:12px;font-weight:bold;color:${b.color};">${b.label}</span>
+                        <span style="font-size:13px;font-weight:bold;color:${b.color};">${data_b.count} ítem(s) · ${fmt(data_b.total)}</span>
+                    </div>
+                    <table class="tabla-rec" style="margin:0;"><thead><tr><th>Cliente</th><th>Categoría</th><th>Debe</th><th>Fecha venta</th><th>Días</th></tr></thead><tbody>`;
+                data_b.items.forEach(it => {
+                    html += `<tr>
+                        <td>${it.cliente}</td>
+                        <td style="font-size:11px;">${it.categoria || '—'}</td>
+                        <td><span class="debe-badge">${fmt(it.debe)}</span></td>
+                        <td style="font-size:11px;color:#aaa;">${it.fecha}</td>
+                        <td style="text-align:center;color:#888;font-size:11px;">${it.dias}d</td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+            });
+            document.getElementById(elId).innerHTML = hayDatos ? html : '<p style="color:#aaa;font-size:13px;text-align:center;padding:16px;">Sin deudas pendientes ✓</p>';
+        }
+        renderAging(d.deudores_aging, 'tabla-deudores-aging');
 
         // ── COBROS: KPIs ──
         const cobrosTotal = d.cobros_ef_efectivo + d.cobros_ef_yape + d.cobros_ef_plin + d.cobros_ef_giro;
@@ -2150,6 +2294,9 @@ function cargarDashboard() {
             });
         }
         document.getElementById('tabla-cobros-recientes').innerHTML = htmlCR + '</tbody></table>';
+
+        // ── COBROS: pendientes por antigüedad ──
+        renderAging(d.pendientes_cobro, 'tabla-pendientes-cobro');
 
         document.getElementById('dash-contenido').style.display = 'block';
         dashCargado = true;
