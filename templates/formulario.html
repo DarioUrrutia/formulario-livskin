@@ -1991,6 +1991,23 @@ cambiarTab = function(tab) {
     }
 };
 
+// ── Anti-doble-envío: deshabilitar botón al hacer submit ─────────────────────
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        const btn = this.querySelector('button[type="submit"]');
+        if (!btn) return;
+        if (btn.disabled) {
+            e.preventDefault();  // ya fue enviado, bloquear segundo intento
+            return false;
+        }
+        btn.disabled = true;
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Guardando...';
+        btn.style.opacity = '0.65';
+        btn.style.cursor = 'not-allowed';
+    });
+});
+
 // Fechas de hoy por defecto
 ['fecha-venta', 'fecha-gasto', 'fecha-cobro'].forEach(id => {
     const el = document.getElementById(id);
