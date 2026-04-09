@@ -682,6 +682,10 @@
                         <div class="kpi-label">Total Gastos</div>
                         <div class="kpi-valor kpi-rojo-txt" id="kpi-gastos">—</div>
                     </div>
+                    <div class="kpi-card kpi-rojo" id="kpi-descuentos-wrap" style="display:none;">
+                        <div class="kpi-label">💸 Descuentos Otorgados</div>
+                        <div class="kpi-valor kpi-rojo-txt" id="kpi-descuentos">—</div>
+                    </div>
                 </div>
 
                 <div class="chart-card">
@@ -1162,6 +1166,35 @@ function agregarItem() {
             <!-- Hidden: precio en Soles enviado al servidor -->
             <input type="hidden" name="total_item_${i}" id="total_item_${i}" value="0">
         </div>
+        <!-- Sección de promoción / descuento -->
+        <div style="background:#fff8f8;border:1px dashed #e8a0a0;border-radius:8px;padding:10px 12px;margin-top:4px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <input type="checkbox" id="tiene_promo_${i}" onchange="togglePromo(${i})"
+                       style="width:15px;height:15px;accent-color:#C0392B;">
+                <label for="tiene_promo_${i}" style="font-size:12px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;">
+                    ¿Tiene promoción / descuento?
+                </label>
+            </div>
+            <div id="promo-campos-${i}" style="display:none;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div class="field" style="margin:0;">
+                        <label style="font-size:11px;">Precio de lista S/</label>
+                        <input type="number" name="precio_lista_${i}" id="precio_lista_${i}"
+                               placeholder="0" step="1" min="0"
+                               oninput="calcularDescuento(${i})"
+                               style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div class="field" style="margin:0;">
+                        <label style="font-size:11px;">Descuento S/</label>
+                        <input type="number" name="descuento_${i}" id="descuento_${i}"
+                               placeholder="0" step="1" min="0"
+                               oninput="calcularDescuento(${i})"
+                               style="width:100%;box-sizing:border-box;">
+                    </div>
+                </div>
+                <div id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;margin-top:6px;font-weight:bold;"></div>
+            </div>
+        </div>
     `;
     container.appendChild(div);
     document.getElementById('num_items').value = itemCount;
@@ -1173,6 +1206,40 @@ function eliminarItem(i) {
     if (el) el.remove();
     delete pagosPorItem[i];
     actualizarResumen();
+}
+
+function togglePromo(i) {
+    const show = document.getElementById(`tiene_promo_${i}`).checked;
+    const campos = document.getElementById(`promo-campos-${i}`);
+    if (campos) campos.style.display = show ? 'block' : 'none';
+    if (!show) {
+        const pl = document.getElementById(`precio_lista_${i}`);
+        const dc = document.getElementById(`descuento_${i}`);
+        if (pl) pl.value = '';
+        if (dc) dc.value = '';
+        const res = document.getElementById(`promo-resumen-${i}`);
+        if (res) res.textContent = '';
+    }
+}
+
+function calcularDescuento(i) {
+    const lista = parseFloat(document.getElementById(`precio_lista_${i}`)?.value || 0);
+    const desc  = parseFloat(document.getElementById(`descuento_${i}`)?.value || 0);
+    const res   = document.getElementById(`promo-resumen-${i}`);
+    if (!res) return;
+    if (lista > 0 && desc >= 0) {
+        const cobrado = Math.max(0, lista - desc);
+        const pct = lista > 0 ? Math.round((desc / lista) * 100) : 0;
+        res.textContent = `Precio cobrado: S/ ${cobrado} (descuento ${pct}%)`;
+        // Actualizar el precio de venta del ítem automáticamente
+        const precioOrig = document.getElementById(`precio_orig_${i}`);
+        if (precioOrig && cobrado > 0) {
+            precioOrig.value = cobrado;
+            actualizarPrecioItem(i);
+        }
+    } else {
+        res.textContent = '';
+    }
 }
 
 function toggleOtroItem(sel, i) {
@@ -2116,6 +2183,12 @@ function cargarDashboard() {
         document.getElementById('kpi-trat').textContent       = fmt(d.total_tratamientos);
         document.getElementById('kpi-prod').textContent       = fmt(d.total_productos);
         document.getElementById('kpi-gastos').textContent     = fmt(d.total_gastos);
+        if (d.total_descuentos > 0) {
+            const el = document.getElementById('kpi-descuentos');
+            if (el) el.textContent = fmt(d.total_descuentos);
+            const wrap = document.getElementById('kpi-descuentos-wrap');
+            if (wrap) wrap.style.display = 'block';
+        }
 
         // ── GENERAL: comparativas mes ──
         function deltaChip(val) {

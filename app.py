@@ -36,7 +36,8 @@ def _invalidate_cache():
 ENCABEZADOS_VENTAS = [
     "#", "FECHA", "COD_CLIENTE", "CLIENTE", "TELEFONO", "TIPO", "COD_ITEM",
     "CATEGORIA", "ZONA/CANTIDAD/ENVASE", "PROXIMA CITA", "FECHA_NAC",
-    "MONEDA", "TOTAL S/ (PEN)", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO", "TC"
+    "MONEDA", "TOTAL S/ (PEN)", "EFECTIVO", "YAPE", "PLIN", "GIRO", "DEBE", "PAGADO", "TC",
+    "PRECIO LISTA S/", "DESCUENTO S/"
 ]
 
 ENCABEZADOS_GASTOS = [
@@ -337,7 +338,12 @@ def guardar_venta():
             zona         = request.form.get(f"zona_{i}", "")
             moneda_item  = request.form.get(f"moneda_item_{i}", "Soles")
             tc_item      = request.form.get(f"tc_item_{i}", "") or ""
+            precio_lista = to_float(request.form.get(f"precio_lista_{i}", "0") or "0")
+            descuento    = to_float(request.form.get(f"descuento_{i}", "0") or "0")
             precio_soles = to_float(request.form.get(f"total_item_{i}", "0") or "0")
+            # Si ingresaron precio de lista, el precio cobrado = lista - descuento
+            if precio_lista > 0 and descuento > 0:
+                precio_soles = max(0.0, precio_lista - descuento)
             pago_item    = min(
                 to_float(request.form.get(f"pago_item_{i}", "0") or "0"),
                 precio_soles  # nunca cobrar más del precio del ítem
@@ -355,6 +361,7 @@ def guardar_venta():
                 "moneda": moneda_item, "tc": tc_item,
                 "precio": precio_soles, "pago": pago_item, "debe": debe_item,
                 "cod_item": cod_item,
+                "precio_lista": precio_lista, "descuento": descuento,
             })
 
         # Normalizar: si el total distribuido supera lo pagado hoy, recortar proporcionalmente
@@ -384,11 +391,14 @@ def guardar_venta():
             ventas.append_row([
                 num, fecha, cod_cliente, cliente, telefono,
                 item["tipo"], item["cod_item"], item["categoria"], item["zona"],
-                "", cumpleanos, item["moneda"], round(item["precio"]) if item["precio"] else "",
+                "", cumpleanos, item["moneda"],
+                round(item["precio"]) if item["precio"] else "",
                 ef, ya, pl, gi,
                 round(item["debe"]) if item["debe"] else "",
                 round(item["pago"]) if item["pago"] else "",
-                item["tc"]
+                item["tc"],
+                round(item["precio_lista"]) if item["precio_lista"] else "",
+                round(item["descuento"]) if item["descuento"] else "",
             ])
 
         # ── Fase 3: registrar en Cobros (uno por ítem pagado, relacional) ─────
@@ -723,6 +733,8 @@ def api_dashboard():
             "total":     total_v,
             "cobrado":   cobrado_item,
             "debe":      debe_real,
+            "precio_lista": parse_num(g(20)),
+            "descuento":    parse_num(g(21)),
         })
 
     # ── Leer gastos del mismo período ─────────────────────────────────────────
@@ -778,12 +790,13 @@ def api_dashboard():
         })
 
     # ── KPIs financieros ──────────────────────────────────────────────────────
-    ventas_total    = sum(f["total"]   for f in filas)
-    cobrado_total   = sum(f["cobrado"] for f in filas)
-    pendiente_total = sum(f["debe"]    for f in filas)
+    ventas_total       = sum(f["total"]     for f in filas)
+    cobrado_total      = sum(f["cobrado"]   for f in filas)
+    pendiente_total    = sum(f["debe"]      for f in filas)
+    total_descuentos   = sum(f["descuento"] for f in filas if f.get("descuento"))
     num_atenciones  = len(filas)
     num_clientes    = len({f["cliente"] for f in filas if f["cliente"]})
-    num_promociones = sum(1 for f in filas if f["tipo"] == "Promoción")
+    num_promociones = sum(1 for f in filas if f.get("descuento", 0) > 0)
     ticket_promedio = ventas_total / num_atenciones if num_atenciones else 0
     tasa_cobro      = (cobrado_total / ventas_total * 100) if ventas_total else 0
     # balance neto usa cobros reales recibidos en el período (no cobrado por venta)
@@ -1024,9 +1037,10 @@ def api_dashboard():
         "balance_neto":    round(balance_neto, 2),
         "total_gastos":    round(total_gastos, 2),
         # KPIs operativos
-        "num_atenciones":  num_atenciones,
-        "num_clientes":    num_clientes,
-        "num_promociones": num_promociones,
+        "num_atenciones":   num_atenciones,
+        "num_clientes":     num_clientes,
+        "num_promociones":  num_promociones,
+        "total_descuentos": round(total_descuentos, 2),
         # Métodos de pago (ventas)
         "ef_efectivo": round(ef_efectivo, 2),
         "ef_yape":     round(ef_yape, 2),
