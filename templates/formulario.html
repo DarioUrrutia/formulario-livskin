@@ -1167,8 +1167,10 @@ function agregarItem() {
             <input type="hidden" name="total_item_${i}" id="total_item_${i}" value="0">
         </div>
         <!-- Sección de promoción / descuento -->
+        <input type="hidden" name="precio_lista_${i}" id="precio_lista_${i}" value="">
+        <input type="hidden" name="descuento_${i}"    id="descuento_${i}"    value="">
         <div style="background:#fff8f8;border:1px dashed #e8a0a0;border-radius:8px;padding:10px 12px;margin-top:4px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                 <input type="checkbox" id="tiene_promo_${i}" onchange="togglePromo(${i})"
                        style="width:15px;height:15px;accent-color:#C0392B;">
                 <label for="tiene_promo_${i}" style="font-size:12px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;">
@@ -1176,20 +1178,20 @@ function agregarItem() {
                 </label>
             </div>
             <div id="promo-campos-${i}" style="display:none;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                    <div class="field" style="margin:0;">
-                        <label style="font-size:11px;">Precio de lista S/</label>
-                        <input type="number" name="precio_lista_${i}" id="precio_lista_${i}"
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div class="field" style="margin:0;flex:1;min-width:120px;">
+                        <label style="font-size:11px;">Descuento S/</label>
+                        <input type="number" id="descuento_input_${i}"
                                placeholder="0" step="1" min="0"
                                oninput="calcularDescuento(${i})"
                                style="width:100%;box-sizing:border-box;">
                     </div>
-                    <div class="field" style="margin:0;">
-                        <label style="font-size:11px;">Descuento S/</label>
-                        <input type="number" name="descuento_${i}" id="descuento_${i}"
-                               placeholder="0" step="1" min="0"
-                               oninput="calcularDescuento(${i})"
-                               style="width:100%;box-sizing:border-box;">
+                    <div style="display:flex;align-items:center;gap:6px;padding-top:18px;">
+                        <input type="checkbox" id="es_gratis_${i}" onchange="marcarGratis(${i})"
+                               style="width:15px;height:15px;accent-color:#C0392B;">
+                        <label for="es_gratis_${i}" style="font-size:12px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;">
+                            Gratis
+                        </label>
                     </div>
                 </div>
                 <div id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;margin-top:6px;font-weight:bold;"></div>
@@ -1212,33 +1214,74 @@ function togglePromo(i) {
     const show = document.getElementById(`tiene_promo_${i}`).checked;
     const campos = document.getElementById(`promo-campos-${i}`);
     if (campos) campos.style.display = show ? 'block' : 'none';
-    if (!show) {
+    if (show) {
+        // Capturar precio de lista = precio de venta actual
+        const totalHidden = document.getElementById(`total_item_${i}`);
         const pl = document.getElementById(`precio_lista_${i}`);
+        if (pl && totalHidden) pl.value = totalHidden.value || 0;
+    } else {
+        // Restaurar precio de venta al precio de lista original
+        const pl = document.getElementById(`precio_lista_${i}`);
+        const lista = parseFloat(pl?.value || 0);
+        if (lista > 0) {
+            const precioOrig = document.getElementById(`precio_orig_${i}`);
+            if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
+        }
+        // Limpiar hidden fields de descuento
         const dc = document.getElementById(`descuento_${i}`);
-        if (pl) pl.value = '';
+        const dcInput = document.getElementById(`descuento_input_${i}`);
+        const gratis = document.getElementById(`es_gratis_${i}`);
         if (dc) dc.value = '';
+        if (dcInput) dcInput.value = '';
+        if (gratis) gratis.checked = false;
         const res = document.getElementById(`promo-resumen-${i}`);
-        if (res) res.textContent = '';
+        if (res) res.innerHTML = '';
     }
 }
 
 function calcularDescuento(i) {
-    const lista = parseFloat(document.getElementById(`precio_lista_${i}`)?.value || 0);
-    const desc  = parseFloat(document.getElementById(`descuento_${i}`)?.value || 0);
-    const res   = document.getElementById(`promo-resumen-${i}`);
-    if (!res) return;
-    if (lista > 0 && desc >= 0) {
-        const cobrado = Math.max(0, lista - desc);
-        const pct = lista > 0 ? Math.round((desc / lista) * 100) : 0;
-        res.textContent = `Precio cobrado: S/ ${cobrado} (descuento ${pct}%)`;
-        // Actualizar el precio de venta del ítem automáticamente
-        const precioOrig = document.getElementById(`precio_orig_${i}`);
-        if (precioOrig && cobrado > 0) {
-            precioOrig.value = cobrado;
-            actualizarPrecioItem(i);
-        }
+    const pl     = document.getElementById(`precio_lista_${i}`);
+    const lista  = parseFloat(pl?.value || 0);
+    const dcInput = document.getElementById(`descuento_input_${i}`);
+    const desc   = parseFloat(dcInput?.value || 0);
+    const dc     = document.getElementById(`descuento_${i}`);
+    const res    = document.getElementById(`promo-resumen-${i}`);
+    const gratis = document.getElementById(`es_gratis_${i}`);
+
+    if (gratis) gratis.checked = false;
+
+    const cobrado = Math.max(0, lista - desc);
+    const pct = lista > 0 ? Math.round((desc / lista) * 100) : 0;
+
+    if (dc) dc.value = desc;
+    if (res) {
+        res.innerHTML = desc > 0
+            ? `Cliente paga: <strong>S/ ${cobrado}</strong> <span style="color:#888;">(−${pct}% de descuento)</span>`
+            : '';
+    }
+    // Actualizar precio de venta cobrado
+    const precioOrig = document.getElementById(`precio_orig_${i}`);
+    if (precioOrig) { precioOrig.value = cobrado; actualizarPrecioItem(i); }
+}
+
+function marcarGratis(i) {
+    const checked = document.getElementById(`es_gratis_${i}`).checked;
+    const pl     = document.getElementById(`precio_lista_${i}`);
+    const lista  = parseFloat(pl?.value || 0);
+    const dcInput = document.getElementById(`descuento_input_${i}`);
+    const dc     = document.getElementById(`descuento_${i}`);
+    const res    = document.getElementById(`promo-resumen-${i}`);
+    const precioOrig = document.getElementById(`precio_orig_${i}`);
+
+    if (checked) {
+        if (dcInput) dcInput.value = '';
+        if (dc) dc.value = lista; // descuento = precio total
+        if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">GRATIS — descuento total S/ ${lista}</span>`;
+        if (precioOrig) { precioOrig.value = 0; actualizarPrecioItem(i); }
     } else {
-        res.textContent = '';
+        if (dc) dc.value = '';
+        if (res) res.innerHTML = '';
+        if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
     }
 }
 
