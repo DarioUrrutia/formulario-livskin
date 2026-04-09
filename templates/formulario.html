@@ -1316,21 +1316,25 @@ function actualizarResumen() {
     items.forEach(it => {
         const esUltimo = it.idx === lastIdx;
         const valActual = pagosPorItem[it.idx] !== undefined ? pagosPorItem[it.idx] : '';
-        if (esUltimo) {
-            // Último ítem: se auto-llena con el restante, solo lectura
+        if (esUltimo && items.length > 1) {
+            // Último ítem (cuando hay varios): se auto-llena con el restante, editable
             distHtml += `
             <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:13px;font-weight:bold;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.label}</div>
-                        <div style="font-size:11px;color:#aaa;">Precio: ${it.precioDisplay} · <em>se llena automáticamente</em></div>
+                        <div style="font-size:11px;color:#aaa;">Precio: ${it.precioDisplay} · <em>se llena con el restante</em></div>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
                         <span style="font-size:12px;color:#888;">S/</span>
                         <input type="number" name="pago_item_${it.idx}" id="pago_item_${it.idx}"
                                value="${valActual}" placeholder="0" step="1" min="0" max="${it.precioSoles}"
-                               readonly
-                               style="width:80px;padding:7px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:right;background:#f9f9f9;color:#888;">
+                               oninput="
+                                   let v=Math.min(parseFloat(this.value)||0, ${it.precioSoles});
+                                   this.value = v || '';
+                                   pagosPorItem[${it.idx}] = v;
+                                   actualizarDistribucion();"
+                               style="width:80px;padding:7px 8px;border:1.5px solid #aad4f0;border-radius:6px;font-size:13px;text-align:right;background:#f4faff;">
                     </div>
                 </div>
                 <div id="saldo-item-${it.idx}" style="font-size:11px;margin-top:4px;color:#aaa;text-align:right;"></div>
@@ -1401,18 +1405,23 @@ function actualizarDistribucion() {
     const saldoFavor = Math.max(0, pagadoHoy - totalSoles - totalDeuda);
     const disponible = Math.max(0, pagadoHoy - saldoFavor);
 
-    // ── 1) Distribuir en deudas primero (auto-llenado con caps) ──
+    // ── 1) Distribuir en deudas primero ──
+    // Solo aplicar el cap de disponible cuando hay dinero real ingresado;
+    // si pagadoHoy=0, los inputs muestran el monto predeterminado sin zeroearse.
     let deudaDistribuida = 0;
     deudasPendientesCliente.forEach((d, idx) => {
         const inputEl = document.getElementById(`deuda_monto_${idx}`);
         if (!inputEl) return;
         let v = parseFloat(inputEl.value || 0);
-        v = Math.min(v, d.debe);
-        const maxParaEste = Math.max(0, disponible - deudaDistribuida);
-        v = Math.min(v, maxParaEste);
-        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
-            inputEl.value = v > 0 ? Math.round(v) : '';
-            deudasPagos[idx] = v;
+        v = Math.min(v, d.debe); // nunca más del monto de deuda
+        if (pagadoHoy > 0) {
+            // Solo reducir si excede lo disponible, nunca forzar a 0 artificialmente
+            const maxParaEste = Math.max(0, disponible - deudaDistribuida);
+            if (v > maxParaEste + 0.5) {
+                v = maxParaEste;
+                inputEl.value = v > 0 ? Math.round(v) : '';
+                deudasPagos[idx] = v;
+            }
         }
         deudaDistribuida += v;
     });
@@ -1440,13 +1449,13 @@ function actualizarDistribucion() {
         distribuidoItems += v;
     });
 
-    // Último ítem: auto-llena con el restante
-    if (items.length > 0) {
+    // Último ítem (cuando hay varios): auto-llena con el restante solo si hay dinero
+    if (items.length > 1) {
         const lastItem = items[items.length - 1];
         const inputEl  = document.getElementById(`pago_item_${lastItem.idx}`);
         if (inputEl) {
             const resto = Math.min(lastItem.precioSoles, Math.max(0, disponibleItems - distribuidoItems));
-            const nuevoVal = pagadoHoy > 0 ? Math.round(resto) : 0;
+            const nuevoVal = pagadoHoy > 0 ? Math.round(resto) : (parseFloat(inputEl.value) || 0);
             inputEl.value = nuevoVal > 0 ? nuevoVal : '';
             pagosPorItem[lastItem.idx] = nuevoVal;
             distribuidoItems += nuevoVal;
