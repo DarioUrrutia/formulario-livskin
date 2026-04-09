@@ -268,6 +268,12 @@
                 <div id="cod-cliente-badge" style="display:none; margin-top:4px; font-size:11px; color:#aaa; letter-spacing:0.3px; padding-left:2px;">
                     <span id="cod-cliente-texto"></span>
                 </div>
+                <!-- Alerta de deuda pendiente -->
+                <div id="alerta-deuda-venta" style="display:none; margin-top:8px; background:#fdf4f4; border:1.5px solid #e8b4b8; border-radius:8px; padding:10px 12px;">
+                    <div style="font-size:12px; font-weight:bold; color:#C0392B; margin-bottom:4px;">⚠ Cliente con saldo pendiente</div>
+                    <div style="font-size:13px; color:#333;">Debe: <strong id="alerta-deuda-monto">S/ 0</strong></div>
+                    <div id="alerta-deuda-detalle" style="margin-top:5px; font-size:11px; color:#888;"></div>
+                </div>
             </div>
             <div class="fila-dos">
                 <div class="field">
@@ -380,6 +386,10 @@
                 <input type="hidden" name="moneda" value="SOLES">
 
             </div>
+
+            <!-- Hidden fields para abonos a deuda anterior -->
+            <input type="hidden" name="num_deudas" id="num_deudas_venta" value="0">
+            <div id="deuda-hidden-fields"></div>
 
             <button type="submit">GUARDAR VENTA</button>
         </form>
@@ -893,6 +903,8 @@ function parseToInputDate(val) {
 let anticiposTimer = null;
 let creditoDisponible = 0;
 let creditoNotas = [];
+let deudasPendientesCliente = [];  // ítems anteriores con DEBE > 0
+let deudasPagos = {};              // { idx: monto asignado }
 
 function actualizarCodigoCliente() {
     const nombre = document.getElementById('input-cliente-venta').value.trim();
@@ -901,9 +913,12 @@ function actualizarCodigoCliente() {
     if (!nombre) {
         badge.style.display = 'none';
         creditoDisponible = 0;
+        deudasPendientesCliente = [];
+        deudasPagos = {};
         document.getElementById('credito-venta-wrap').style.display = 'none';
         document.getElementById('chk-aplicar-credito').checked = false;
         document.getElementById('credito-aplicado-input').value = 0;
+        document.getElementById('alerta-deuda-venta').style.display = 'none';
         return;
     }
 
@@ -954,6 +969,32 @@ function actualizarCodigoCliente() {
                 document.getElementById('credito-aplicado-input').value = 0;
                 document.getElementById('credito-resultado').style.display = 'none';
                 document.getElementById('seccion-como-paga').style.display = 'block';
+
+                // ── Detectar deudas pendientes ──
+                deudasPendientesCliente = d.ventas
+                    .filter(v => parseFloat(v.DEBE || 0) > 0)
+                    .map(v => ({
+                        cod_item:  v.COD_ITEM  || '',
+                        categoria: v.CATEGORIA || v.TIPO || '—',
+                        fecha:     v.FECHA     || '',
+                        debe:      parseFloat(v.DEBE || 0),
+                        total:     parseFloat(v['TOTAL S/ (PEN)'] || v.TOTAL || 0),
+                    }));
+                deudasPagos = {};
+
+                const alertaEl = document.getElementById('alerta-deuda-venta');
+                if (deudasPendientesCliente.length > 0) {
+                    const totalDeuda = deudasPendientesCliente.reduce((s, x) => s + x.debe, 0);
+                    alertaEl.style.display = 'block';
+                    document.getElementById('alerta-deuda-monto').textContent = 'S/ ' + Math.round(totalDeuda);
+                    const detalle = deudasPendientesCliente
+                        .map(x => `${x.categoria} (${x.fecha}): S/ ${Math.round(x.debe)}`)
+                        .join(' · ');
+                    document.getElementById('alerta-deuda-detalle').textContent = detalle;
+                } else {
+                    alertaEl.style.display = 'none';
+                }
+                actualizarResumen();
             })
             .catch(() => {});
     }, 600);
@@ -1272,13 +1313,49 @@ function actualizarResumen() {
             </div>
         </div>
     </div>`;
+    // Sección de deudas anteriores
+    if (deudasPendientesCliente.length > 0) {
+        distHtml += `
+        <div style="margin-top:14px;">
+            <div style="font-size:11px;font-weight:bold;color:#C0392B;text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid #f0f0f0;margin-bottom:2px;">
+                Abonar a deudas anteriores
+            </div>`;
+        deudasPendientesCliente.forEach((d, idx) => {
+            const valActual = deudasPagos[idx] !== undefined ? Math.round(deudasPagos[idx]) : '';
+            distHtml += `
+            <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:bold;color:#C0392B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.categoria}</div>
+                        <div style="font-size:11px;color:#aaa;">Debe S/ ${Math.round(d.debe)} · ${d.fecha}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <span style="font-size:12px;color:#888;">S/</span>
+                        <input type="number" name="deuda_monto_${idx}" id="deuda_monto_${idx}"
+                               value="${valActual}" placeholder="0" step="1" min="0" max="${Math.round(d.debe)}"
+                               oninput="
+                                   let v=Math.min(parseFloat(this.value)||0,${Math.round(d.debe)});
+                                   this.value=v||'';
+                                   deudasPagos[${idx}]=v;
+                                   actualizarDistribucion();"
+                               style="width:80px;padding:7px 8px;border:1.5px solid #e8b4b8;border-radius:6px;font-size:13px;text-align:right;">
+                    </div>
+                </div>
+                <input type="hidden" name="deuda_cod_${idx}" value="${d.cod_item}">
+                <input type="hidden" name="deuda_cat_${idx}" value="${d.categoria}">
+            </div>`;
+        });
+        distHtml += `</div>`;
+    }
     document.getElementById('tabla-dist-items').innerHTML = distHtml;
+    document.getElementById('num_deudas_venta').value = deudasPendientesCliente.length;
     actualizarDistribucion();
 }
 
 function actualizarDistribucion() {
     const items = getItemsData();
     const totalSoles = items.reduce((s, it) => s + it.precioSoles, 0);
+    const totalDeuda = deudasPendientesCliente.reduce((s, d) => s + d.debe, 0);
 
     const creditoAplicado = parseFloat(document.getElementById('credito-aplicado-input')?.value) || 0;
 
@@ -1290,7 +1367,7 @@ function actualizarDistribucion() {
         creditoAplicado;
 
     // Auto-llenado: cada ítem recibe hasta su precio máximo
-    if (items.length === 1) {
+    if (items.length === 1 && deudasPendientesCliente.length === 0) {
         const it = items[0];
         const campo = document.getElementById(`pago_item_${it.idx}`);
         if (campo) {
@@ -1300,11 +1377,11 @@ function actualizarDistribucion() {
         }
     }
 
-    // Calcular saldoFavor y disponible antes del loop
-    const saldoFavor  = Math.max(0, pagadoHoy - totalSoles);
+    // saldoFavor = exceso sobre ítems nuevos + deudas totales combinadas
+    const saldoFavor  = Math.max(0, pagadoHoy - totalSoles - totalDeuda);
     const disponible  = Math.max(0, pagadoHoy - saldoFavor); // lo que se puede distribuir
 
-    // Cap doble por ítem: 1) precio del ítem  2) dinero disponible acumulado
+    // Cap doble por ítem nuevo: 1) precio del ítem  2) dinero disponible acumulado
     let distribuido = 0;
     items.forEach(it => {
         const inputEl = document.getElementById(`pago_item_${it.idx}`);
@@ -1321,7 +1398,21 @@ function actualizarDistribucion() {
         }
         distribuido += v;
     });
-    const porAsignar = pagadoHoy - saldoFavor - distribuido;  // puede ser negativo → error
+    // Cap doble por ítem de deuda: 1) monto de deuda  2) dinero disponible acumulado
+    deudasPendientesCliente.forEach((d, idx) => {
+        const inputEl = document.getElementById(`deuda_monto_${idx}`);
+        if (!inputEl) return;
+        let v = parseFloat(inputEl.value || 0);
+        v = Math.min(v, d.debe);
+        const maxParaEste = Math.max(0, disponible - distribuido);
+        v = Math.min(v, maxParaEste);
+        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
+            inputEl.value = v > 0 ? Math.round(v) : '';
+            deudasPagos[idx] = v;
+        }
+        distribuido += v;
+    });
+    const porAsignar = disponible - distribuido;
     const saldoPend  = totalSoles - pagadoHoy;
 
     // Contador

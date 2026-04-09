@@ -358,6 +358,23 @@ def guardar_venta():
                     item["cod_item"], item["categoria"], next_cod_cobro()
                 ])
 
+        # ── Fase 6: registrar abonos a deudas anteriores ─────────────────────
+        num_deudas = int(request.form.get("num_deudas", 0) or 0)
+        for i in range(num_deudas):
+            monto_deuda = to_float(request.form.get(f"deuda_monto_{i}", "0") or "0")
+            cod_deuda   = request.form.get(f"deuda_cod_{i}", "")
+            cat_deuda   = request.form.get(f"deuda_cat_{i}", "")
+            if monto_deuda <= 0:
+                continue
+            num_cobro = siguiente_numero(cobros)
+            cobros.append_row([
+                num_cobro, fecha, cod_cliente, cliente,
+                round(monto_deuda),
+                "", "", "", "",
+                f"Abono deuda anterior",
+                cod_deuda, cat_deuda, next_cod_cobro()
+            ])
+
         if items_prep:
             saldo = round(total_contratado - total_pagado_hoy)
             msg = f"Venta guardada ({len(items_prep)} ítem(s)) — Cliente: {cod_cliente}"
