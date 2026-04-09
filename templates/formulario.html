@@ -1244,8 +1244,12 @@ function actualizarResumen() {
                 <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
                     <span style="font-size:12px;color:#888;">S/</span>
                     <input type="number" name="pago_item_${it.idx}" id="pago_item_${it.idx}"
-                           value="${valActual}" placeholder="0" step="1" min="0"
-                           oninput="pagosPorItem[${it.idx}]=parseFloat(this.value)||0; actualizarDistribucion();"
+                           value="${valActual}" placeholder="0" step="1" min="0" max="${it.precioSoles}"
+                           oninput="
+                               let v=Math.min(parseFloat(this.value)||0, ${it.precioSoles});
+                               this.value = v || '';
+                               pagosPorItem[${it.idx}] = v;
+                               actualizarDistribucion();"
                            style="width:80px;padding:7px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:right;">
                 </div>
             </div>
@@ -1296,22 +1300,39 @@ function actualizarDistribucion() {
         }
     }
 
+    // Cap cada ítem a su precio y sumar lo distribuido
     let distribuido = 0;
     items.forEach(it => {
-        distribuido += parseFloat(document.getElementById(`pago_item_${it.idx}`)?.value || 0);
+        const inputEl = document.getElementById(`pago_item_${it.idx}`);
+        if (!inputEl) return;
+        let v = parseFloat(inputEl.value || 0);
+        if (v > it.precioSoles) {          // nunca más del precio del ítem
+            v = it.precioSoles;
+            inputEl.value = v || '';
+            pagosPorItem[it.idx] = v;
+        }
+        distribuido += v;
     });
 
-    const saldoFavor  = Math.max(0, pagadoHoy - totalSoles);
-    const porAsignar  = Math.max(0, pagadoHoy - distribuido - saldoFavor);
-    const saldoPend   = totalSoles - pagadoHoy;
+    const saldoFavor = Math.max(0, pagadoHoy - totalSoles);
+    const porAsignar = pagadoHoy - saldoFavor - distribuido;  // puede ser negativo → error
+    const saldoPend  = totalSoles - pagadoHoy;
 
     // Contador
     document.getElementById('cnt-pagado').textContent = `S/ ${Math.round(pagadoHoy)}`;
 
     const porAsignarEl = document.getElementById('cnt-por-asignar');
     porAsignarEl.textContent = `S/ ${Math.abs(Math.round(porAsignar))}`;
-    porAsignarEl.style.color = porAsignar < -0.5 ? '#C0392B' : (porAsignar < 0.5 ? '#27ae60' : '#e67e22');
-    porAsignarEl.previousSibling.textContent = porAsignar < -0.5 ? 'Excede lo pagado: ' : 'Por asignar: ';
+    if (porAsignar < -0.5) {
+        porAsignarEl.style.color = '#C0392B';
+        porAsignarEl.previousSibling.textContent = 'Excede lo pagado: ';
+    } else if (porAsignar < 0.5) {
+        porAsignarEl.style.color = '#27ae60';
+        porAsignarEl.previousSibling.textContent = 'Por asignar: ';
+    } else {
+        porAsignarEl.style.color = '#e67e22';
+        porAsignarEl.previousSibling.textContent = 'Por asignar: ';
+    }
 
     // Saldo pendiente
     const saldoPendEl = document.getElementById('lbl-saldo-pend');

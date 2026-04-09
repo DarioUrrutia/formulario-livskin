@@ -239,7 +239,10 @@ def guardar_venta():
             moneda_item  = request.form.get(f"moneda_item_{i}", "Soles")
             tc_item      = request.form.get(f"tc_item_{i}", "") or ""
             precio_soles = to_float(request.form.get(f"total_item_{i}", "0") or "0")
-            pago_item    = to_float(request.form.get(f"pago_item_{i}", "0") or "0")
+            pago_item    = min(
+                to_float(request.form.get(f"pago_item_{i}", "0") or "0"),
+                precio_soles  # nunca cobrar más del precio del ítem
+            )
             debe_item    = max(0.0, precio_soles - pago_item)
             total_contratado += precio_soles
 
