@@ -1414,9 +1414,10 @@ function getItemsData() {
         if (!tipo) continue;
         const cat       = document.querySelector(`[name="categoria_${i}"]`)?.value || '';
         const moneda    = document.getElementById(`moneda_item_${i}`)?.value || 'Soles';
-        const precioOrig = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
-        const tc         = parseFloat(document.getElementById(`tc_item_${i}`)?.value || 0);
-        const precioSoles = moneda === 'Soles' ? precioOrig : (tc > 0 ? Math.round(precioOrig * tc) : 0);
+        const precioOrig  = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
+        const tc          = parseFloat(document.getElementById(`tc_item_${i}`)?.value || 0);
+        const esGratis    = document.getElementById(`es_gratis_flag_${i}`)?.value === '1';
+        const precioSoles = esGratis ? 0 : (moneda === 'Soles' ? precioOrig : (tc > 0 ? Math.round(precioOrig * tc) : 0));
         const sym        = moneda === 'USD' ? 'US$' : (moneda === 'EUR' ? '€' : 'S/');
         const label      = cat || tipo;
         const precioDisplay = moneda === 'Soles'
