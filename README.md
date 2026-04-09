@@ -15,7 +15,10 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - Métodos de pago: Efectivo, Yape, Plin, Giro — con distribución individual por ítem
 - **Distribución automática de pago**: todos los ítems se rellenan en orden al ingresar el pago; siempre editables manualmente
 - **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
-- **Promociones y descuentos por ítem**: opción `Gratis` (TOTAL = 0, no entra en facturado ni por cobrar) o `Descuento S/` (precio cobrado = lista − descuento); el monto cedido queda registrado en `DESCUENTO S/` para análisis de costo de promociones
+- **Promociones y descuentos por ítem**: opción `Gratis` o `Descuento S/` directamente en cada ítem
+  - **Gratis**: el campo de precio sigue visible como referencia, pero TOTAL = 0; no entra en facturado ni por cobrar; la distribución de pago ignora ese ítem; cualquier pago recibido queda como saldo a favor o cubre deudas anteriores
+  - **Descuento**: precio cobrado = lista − descuento; se registra el monto cedido en `DESCUENTO S/`
+  - Validación doble (frontend + backend) para garantizar integridad
 - **Tipos, categorías y áreas dinámicos**: configurables desde la hoja "Listas" de Google Sheets sin tocar código; la hoja se crea automáticamente con valores por defecto al primer uso
 - Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
 - Protección contra doble registro (botón se deshabilita al enviar)
@@ -119,4 +122,4 @@ Requiere el archivo de credenciales de Google (`livskin-formulario-xxxx.json`) e
 - Caché en memoria por proceso gunicorn con TTL de 90 segundos — lecturas de Sheets son rápidas después de la primera
 - El caché se invalida automáticamente después de cada escritura (venta, cobro, gasto)
 - Endpoint `/ping` para keep-alive con cron externo, evita cold start de 30-60s en Render free tier
-- Validación server-side en ítems gratis: el backend fuerza TOTAL = 0 independientemente del frontend, usando el flag `es_gratis` + verificación `descuento >= precio_lista`
+- Validación doble en ítems gratis: frontend zeriza `total_item` y respeta el flag en `getItemsData` y `actualizarPrecioItem`; backend fuerza TOTAL = 0 con el flag `es_gratis` + verificación `descuento >= precio_lista`
