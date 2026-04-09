@@ -1352,7 +1352,7 @@ function actualizarResumen() {
     items.forEach(it => {
         const esUltimo = it.idx === lastIdx;
         const valActual = pagosPorItem[it.idx] !== undefined ? pagosPorItem[it.idx] : '';
-        if (esUltimo && items.length > 1) {
+        if (esUltimo && items.length >= 1) {
             // Último ítem (cuando hay varios): se auto-llena con el restante, editable
             distHtml += `
             <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
@@ -1507,7 +1507,7 @@ function actualizarDistribucion() {
     });
 
     // Último ítem (cuando hay varios): auto-llena con el restante solo si hay dinero
-    if (items.length > 1) {
+    if (items.length >= 1) {
         const lastItem = items[items.length - 1];
         const inputEl  = document.getElementById(`pago_item_${lastItem.idx}`);
         if (inputEl) {
