@@ -9,12 +9,14 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 ## ¿Qué puede hacer el sistema?
 
 ### Pestaña Venta
-- Registro completo de atenciones: cliente, fecha, tipo (Tratamiento / Producto / Certificado / Promoción), categoría, zona/cantidad/envase, próxima cita
+- Registro completo de atenciones: cliente, fecha, tipo, categoría, zona/cantidad/envase, próxima cita
 - Múltiples ítems por venta en una sola sesión
 - Conversión automática de monedas (USD/EUR → Soles) usando tipo de cambio en tiempo real
 - Métodos de pago: Efectivo, Yape, Plin, Giro — con distribución individual por ítem
-- **Distribución inteligente de pago**: el último ítem se auto-llena con el restante disponible
+- **Distribución automática de pago**: todos los ítems se rellenan en orden al ingresar el pago; siempre editables manualmente
 - **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
+- **Promociones y descuentos por ítem**: opción `Gratis` (precio = 0) o `Descuento S/` (precio cobrado = lista − descuento); queda registrado el descuento otorgado para análisis de costos
+- **Tipos, categorías y áreas dinámicos**: configurables desde la hoja "Listas" de Google Sheets sin tocar código; la hoja se crea automáticamente con valores por defecto al primer uso
 - Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
 - Protección contra doble registro (botón se deshabilita al enviar)
 
@@ -96,10 +98,11 @@ ProyectosClaude/
 
 | Hoja | Columnas principales |
 |---|---|
-| Ventas | #, FECHA, COD_CLIENTE, CLIENTE, TELEFONO, TIPO, COD_ITEM, CATEGORIA, ZONA, PROXIMA CITA, FECHA_NAC, MONEDA, TOTAL S/ (PEN), EFECTIVO, YAPE, PLIN, GIRO, DEBE, PAGADO, TC |
+| Ventas | #, FECHA, COD_CLIENTE, CLIENTE, TELEFONO, TIPO, COD_ITEM, CATEGORIA, ZONA, PROXIMA CITA, FECHA_NAC, MONEDA, TOTAL S/ (PEN), EFECTIVO, YAPE, PLIN, GIRO, DEBE, PAGADO, TC, PRECIO LISTA S/, DESCUENTO S/ |
 | Cobros | #, FECHA, COD_CLIENTE, CLIENTE, MONTO, EFECTIVO, YAPE, PLIN, GIRO, NOTAS, COD_ITEM, CATEGORIA, COD_COBRO |
 | Clientes | COD_CLIENTE, NOMBRE, TELEFONO, FECHA_NAC, FECHA_REGISTRO, EMAIL |
 | Gastos | #, FECHA, TIPO, DESCRIPCION, DESTINATARIO, MONTO, METODO DE PAGO |
+| Listas | LISTA, VALOR — configura tipos (`tipo`), categorías (`cat_Tipo`), áreas (`area`), precios de lista (`precio_Categoría`) |
 
 ## Desarrollo local
 
