@@ -340,9 +340,14 @@ def guardar_venta():
             tc_item      = request.form.get(f"tc_item_{i}", "") or ""
             precio_lista = to_float(request.form.get(f"precio_lista_{i}", "0") or "0")
             descuento    = to_float(request.form.get(f"descuento_{i}", "0") or "0")
+            es_gratis    = request.form.get(f"es_gratis_{i}", "0") == "1"
             precio_soles = to_float(request.form.get(f"total_item_{i}", "0") or "0")
-            # precio_lista viene del hidden field (capturado antes de aplicar el descuento)
-            # precio_soles ya viene calculado por el frontend como (lista - descuento)
+
+            # Validación server-side: si es gratis o descuento cubre el precio completo → TOTAL = 0
+            if es_gratis or (precio_lista > 0 and descuento >= precio_lista):
+                precio_soles = 0.0
+                descuento    = precio_lista  # asegurar que el descuento refleje el total
+
             pago_item    = min(
                 to_float(request.form.get(f"pago_item_{i}", "0") or "0"),
                 precio_soles  # nunca cobrar más del precio del ítem
