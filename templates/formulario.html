@@ -1557,15 +1557,34 @@ function autoRellenarPorPago() {
         (parseFloat(document.getElementById('ef-giro')?.value)    || 0) +
         creditoAplicado;
 
-    // Rellenar deudas en orden: hasta cubrir cada una con lo disponible
-    let disponibleDeuda = pagadoHoy;
+    if (pagadoHoy <= 0) {
+        actualizarDistribucion();
+        return;
+    }
+
+    // 1) Rellenar deudas en orden
+    let disponible = pagadoHoy;
     deudasPendientesCliente.forEach((d, idx) => {
         const inputEl = document.getElementById(`deuda_monto_${idx}`);
         if (!inputEl) return;
-        const autoVal = Math.round(Math.min(d.debe, Math.max(0, disponibleDeuda)));
-        inputEl.value = autoVal > 0 ? autoVal : '';
-        deudasPagos[idx] = autoVal;
-        disponibleDeuda -= autoVal;
+        const val = Math.round(Math.min(d.debe, Math.max(0, disponible)));
+        inputEl.value = val > 0 ? val : '';
+        deudasPagos[idx] = val;
+        disponible -= val;
+    });
+
+    // 2) Rellenar ítems en orden: cada uno hasta su precio, el último con el restante exacto
+    const items = getItemsData();
+    items.forEach((it, pos) => {
+        const inputEl = document.getElementById(`pago_item_${it.idx}`);
+        if (!inputEl) return;
+        const esUltimo = pos === items.length - 1;
+        const val = esUltimo
+            ? Math.round(Math.min(it.precioSoles, Math.max(0, disponible)))
+            : Math.round(Math.min(it.precioSoles, Math.max(0, disponible)));
+        inputEl.value = val > 0 ? val : '';
+        pagosPorItem[it.idx] = val;
+        disponible -= val;
     });
 
     actualizarDistribucion();
@@ -1608,38 +1627,21 @@ function actualizarDistribucion() {
     // Dinero que queda para ítems nuevos
     const disponibleItems = Math.max(0, disponible - deudaDistribuida);
 
-    // ── 2) Ítems nuevos: todos menos el último son manuales; el último recibe el restante ──
-    const lastIdx = items.length > 0 ? items[items.length - 1].idx : -1;
+    // ── 2) Ítems nuevos: respetar valor actual, solo capear si excede precio o disponible ──
     let distribuidoItems = 0;
-
     items.forEach(it => {
         const inputEl = document.getElementById(`pago_item_${it.idx}`);
         if (!inputEl) return;
-        if (it.idx === lastIdx) return; // el último se procesa después
-
         let v = parseFloat(inputEl.value || 0);
         v = Math.min(v, it.precioSoles);
         const maxParaEste = Math.max(0, disponibleItems - distribuidoItems);
-        v = Math.min(v, maxParaEste);
-        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
+        if (v > maxParaEste + 0.5) {
+            v = maxParaEste;
             inputEl.value = v > 0 ? Math.round(v) : '';
             pagosPorItem[it.idx] = v;
         }
         distribuidoItems += v;
     });
-
-    // Último ítem (cuando hay varios): auto-llena con el restante solo si hay dinero
-    if (items.length >= 1) {
-        const lastItem = items[items.length - 1];
-        const inputEl  = document.getElementById(`pago_item_${lastItem.idx}`);
-        if (inputEl) {
-            const resto = Math.min(lastItem.precioSoles, Math.max(0, disponibleItems - distribuidoItems));
-            const nuevoVal = pagadoHoy > 0 ? Math.round(resto) : (parseFloat(inputEl.value) || 0);
-            inputEl.value = nuevoVal > 0 ? nuevoVal : '';
-            pagosPorItem[lastItem.idx] = nuevoVal;
-            distribuidoItems += nuevoVal;
-        }
-    }
 
     const distribuido  = deudaDistribuida + distribuidoItems;
     const porAsignar   = disponible - distribuido;
