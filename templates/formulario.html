@@ -980,7 +980,9 @@ function actualizarCodigoCliente() {
                         debe:      parseFloat(v.DEBE || 0),
                         total:     parseFloat(v['TOTAL S/ (PEN)'] || v.TOTAL || 0),
                     }));
+                // Inicializar con monto completo como predeterminado
                 deudasPagos = {};
+                deudasPendientesCliente.forEach((d, idx) => { deudasPagos[idx] = d.debe; });
 
                 const alertaEl = document.getElementById('alerta-deuda-venta');
                 if (deudasPendientesCliente.length > 0) {
@@ -1273,55 +1275,17 @@ function actualizarResumen() {
 
     // ── Tabla de distribución ──
     let distHtml = '';
-    items.forEach(it => {
-        const valActual = pagosPorItem[it.idx] !== undefined ? pagosPorItem[it.idx] : '';
-        distHtml += `
-        <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:bold;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.label}</div>
-                    <div style="font-size:11px;color:#aaa;">Precio: ${it.precioDisplay}</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-                    <span style="font-size:12px;color:#888;">S/</span>
-                    <input type="number" name="pago_item_${it.idx}" id="pago_item_${it.idx}"
-                           value="${valActual}" placeholder="0" step="1" min="0" max="${it.precioSoles}"
-                           oninput="
-                               let v=Math.min(parseFloat(this.value)||0, ${it.precioSoles});
-                               this.value = v || '';
-                               pagosPorItem[${it.idx}] = v;
-                               actualizarDistribucion();"
-                           style="width:80px;padding:7px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:right;">
-                </div>
-            </div>
-            <div id="saldo-item-${it.idx}" style="font-size:11px;margin-top:4px;color:#aaa;text-align:right;"></div>
-        </div>`;
-    });
-    // Fila de crédito (siempre presente, se muestra/oculta dinámicamente)
-    distHtml += `
-    <div id="credito-dist-fila" style="display:none;padding:10px 0;border-bottom:1px solid #f0f0f0;background:#fffdf0;border-radius:6px;padding:10px 12px;margin-top:6px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:bold;color:#856404;">Crédito a favor del cliente</div>
-                <input type="text" id="credito-exceso-nota" name="credito_exceso_nota"
-                    placeholder="Nota opcional (ej: para próxima sesión)"
-                    style="font-size:11px;color:#aaa;border:none;background:transparent;width:100%;margin-top:3px;outline:none;">
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-                <span style="font-size:12px;color:#856404;">S/</span>
-                <div id="credito-exceso-display" style="width:80px;padding:7px 8px;background:#fff8e1;border:1.5px solid #f0d060;border-radius:6px;font-size:13px;font-weight:bold;color:#856404;text-align:right;">0</div>
-            </div>
-        </div>
-    </div>`;
-    // Sección de deudas anteriores
+    const lastIdx = items.length > 0 ? items[items.length - 1].idx : -1;
+
+    // 1) Deudas anteriores PRIMERO (si hay)
     if (deudasPendientesCliente.length > 0) {
         distHtml += `
-        <div style="margin-top:14px;">
+        <div style="margin-bottom:6px;">
             <div style="font-size:11px;font-weight:bold;color:#C0392B;text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid #f0f0f0;margin-bottom:2px;">
                 Abonar a deudas anteriores
             </div>`;
         deudasPendientesCliente.forEach((d, idx) => {
-            const valActual = deudasPagos[idx] !== undefined ? Math.round(deudasPagos[idx]) : '';
+            const valActual = deudasPagos[idx] !== undefined ? Math.round(deudasPagos[idx]) : Math.round(d.debe);
             distHtml += `
             <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -1347,6 +1311,73 @@ function actualizarResumen() {
         });
         distHtml += `</div>`;
     }
+
+    // 2) Ítems nuevos
+    items.forEach(it => {
+        const esUltimo = it.idx === lastIdx;
+        const valActual = pagosPorItem[it.idx] !== undefined ? pagosPorItem[it.idx] : '';
+        if (esUltimo) {
+            // Último ítem: se auto-llena con el restante, solo lectura
+            distHtml += `
+            <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:bold;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.label}</div>
+                        <div style="font-size:11px;color:#aaa;">Precio: ${it.precioDisplay} · <em>se llena automáticamente</em></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <span style="font-size:12px;color:#888;">S/</span>
+                        <input type="number" name="pago_item_${it.idx}" id="pago_item_${it.idx}"
+                               value="${valActual}" placeholder="0" step="1" min="0" max="${it.precioSoles}"
+                               readonly
+                               style="width:80px;padding:7px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:right;background:#f9f9f9;color:#888;">
+                    </div>
+                </div>
+                <div id="saldo-item-${it.idx}" style="font-size:11px;margin-top:4px;color:#aaa;text-align:right;"></div>
+            </div>`;
+        } else {
+            // Ítems no-último: entrada manual
+            distHtml += `
+            <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:bold;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.label}</div>
+                        <div style="font-size:11px;color:#aaa;">Precio: ${it.precioDisplay}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <span style="font-size:12px;color:#888;">S/</span>
+                        <input type="number" name="pago_item_${it.idx}" id="pago_item_${it.idx}"
+                               value="${valActual}" placeholder="0" step="1" min="0" max="${it.precioSoles}"
+                               oninput="
+                                   let v=Math.min(parseFloat(this.value)||0, ${it.precioSoles});
+                                   this.value = v || '';
+                                   pagosPorItem[${it.idx}] = v;
+                                   actualizarDistribucion();"
+                               style="width:80px;padding:7px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:right;">
+                    </div>
+                </div>
+                <div id="saldo-item-${it.idx}" style="font-size:11px;margin-top:4px;color:#aaa;text-align:right;"></div>
+            </div>`;
+        }
+    });
+
+    // 3) Fila de crédito (siempre presente, se muestra/oculta dinámicamente)
+    distHtml += `
+    <div id="credito-dist-fila" style="display:none;background:#fffdf0;border-radius:6px;padding:10px 12px;margin-top:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:bold;color:#856404;">Crédito a favor del cliente</div>
+                <input type="text" id="credito-exceso-nota" name="credito_exceso_nota"
+                    placeholder="Nota opcional (ej: para próxima sesión)"
+                    style="font-size:11px;color:#aaa;border:none;background:transparent;width:100%;margin-top:3px;outline:none;">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                <span style="font-size:12px;color:#856404;">S/</span>
+                <div id="credito-exceso-display" style="width:80px;padding:7px 8px;background:#fff8e1;border:1.5px solid #f0d060;border-radius:6px;font-size:13px;font-weight:bold;color:#856404;text-align:right;">0</div>
+            </div>
+        </div>
+    </div>`;
+
     document.getElementById('tabla-dist-items').innerHTML = distHtml;
     document.getElementById('num_deudas_venta').value = deudasPendientesCliente.length;
     actualizarDistribucion();
@@ -1366,54 +1397,65 @@ function actualizarDistribucion() {
         (parseFloat(document.getElementById('ef-giro')?.value)    || 0) +
         creditoAplicado;
 
-    // Auto-llenado: cada ítem recibe hasta su precio máximo
-    if (items.length === 1 && deudasPendientesCliente.length === 0) {
-        const it = items[0];
-        const campo = document.getElementById(`pago_item_${it.idx}`);
-        if (campo) {
-            const asignado = Math.min(pagadoHoy, it.precioSoles);
-            campo.value = pagadoHoy > 0 ? Math.round(asignado) : '';
-            pagosPorItem[it.idx] = asignado;
-        }
-    }
-
     // saldoFavor = exceso sobre ítems nuevos + deudas totales combinadas
-    const saldoFavor  = Math.max(0, pagadoHoy - totalSoles - totalDeuda);
-    const disponible  = Math.max(0, pagadoHoy - saldoFavor); // lo que se puede distribuir
+    const saldoFavor = Math.max(0, pagadoHoy - totalSoles - totalDeuda);
+    const disponible = Math.max(0, pagadoHoy - saldoFavor);
 
-    // Cap doble por ítem nuevo: 1) precio del ítem  2) dinero disponible acumulado
-    let distribuido = 0;
-    items.forEach(it => {
-        const inputEl = document.getElementById(`pago_item_${it.idx}`);
-        if (!inputEl) return;
-        let v = parseFloat(inputEl.value || 0);
-        // Cap 1: nunca más del precio del ítem
-        v = Math.min(v, it.precioSoles);
-        // Cap 2: nunca más de lo que queda por distribuir
-        const maxParaEste = Math.max(0, disponible - distribuido);
-        v = Math.min(v, maxParaEste);
-        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
-            inputEl.value = v > 0 ? Math.round(v) : '';
-            pagosPorItem[it.idx] = v;
-        }
-        distribuido += v;
-    });
-    // Cap doble por ítem de deuda: 1) monto de deuda  2) dinero disponible acumulado
+    // ── 1) Distribuir en deudas primero (auto-llenado con caps) ──
+    let deudaDistribuida = 0;
     deudasPendientesCliente.forEach((d, idx) => {
         const inputEl = document.getElementById(`deuda_monto_${idx}`);
         if (!inputEl) return;
         let v = parseFloat(inputEl.value || 0);
         v = Math.min(v, d.debe);
-        const maxParaEste = Math.max(0, disponible - distribuido);
+        const maxParaEste = Math.max(0, disponible - deudaDistribuida);
         v = Math.min(v, maxParaEste);
         if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
             inputEl.value = v > 0 ? Math.round(v) : '';
             deudasPagos[idx] = v;
         }
-        distribuido += v;
+        deudaDistribuida += v;
     });
-    const porAsignar = disponible - distribuido;
-    const saldoPend  = totalSoles - pagadoHoy;
+
+    // Dinero que queda para ítems nuevos
+    const disponibleItems = Math.max(0, disponible - deudaDistribuida);
+
+    // ── 2) Ítems nuevos: todos menos el último son manuales; el último recibe el restante ──
+    const lastIdx = items.length > 0 ? items[items.length - 1].idx : -1;
+    let distribuidoItems = 0;
+
+    items.forEach(it => {
+        const inputEl = document.getElementById(`pago_item_${it.idx}`);
+        if (!inputEl) return;
+        if (it.idx === lastIdx) return; // el último se procesa después
+
+        let v = parseFloat(inputEl.value || 0);
+        v = Math.min(v, it.precioSoles);
+        const maxParaEste = Math.max(0, disponibleItems - distribuidoItems);
+        v = Math.min(v, maxParaEste);
+        if (Math.abs(v - parseFloat(inputEl.value || 0)) > 0.5) {
+            inputEl.value = v > 0 ? Math.round(v) : '';
+            pagosPorItem[it.idx] = v;
+        }
+        distribuidoItems += v;
+    });
+
+    // Último ítem: auto-llena con el restante
+    if (items.length > 0) {
+        const lastItem = items[items.length - 1];
+        const inputEl  = document.getElementById(`pago_item_${lastItem.idx}`);
+        if (inputEl) {
+            const resto = Math.min(lastItem.precioSoles, Math.max(0, disponibleItems - distribuidoItems));
+            const nuevoVal = pagadoHoy > 0 ? Math.round(resto) : 0;
+            inputEl.value = nuevoVal > 0 ? nuevoVal : '';
+            pagosPorItem[lastItem.idx] = nuevoVal;
+            distribuidoItems += nuevoVal;
+        }
+    }
+
+    const distribuido  = deudaDistribuida + distribuidoItems;
+    const porAsignar   = disponible - distribuido;
+    const saldoPend    = totalSoles - distribuidoItems; // deuda de ítems nuevos únicamente
 
     // Contador
     document.getElementById('cnt-pagado').textContent = `S/ ${Math.round(pagadoHoy)}`;
