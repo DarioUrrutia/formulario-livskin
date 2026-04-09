@@ -52,6 +52,53 @@ ENCABEZADOS_CLIENTES = [
     "COD_CLIENTE", "NOMBRE", "TELEFONO", "FECHA_NAC", "FECHA_REGISTRO", "EMAIL"
 ]
 
+ENCABEZADOS_LISTAS = ["LISTA", "VALOR"]
+
+# Valores por defecto que se cargan si la hoja Listas está vacía
+LISTAS_DEFAULT = [
+    ("tipo",            "Tratamiento"),
+    ("tipo",            "Producto"),
+    ("tipo",            "Certificado"),
+    ("tipo",            "Promoción"),
+    ("cat_Tratamiento", "Botox"),
+    ("cat_Tratamiento", "Ácido Hialurónico"),
+    ("cat_Tratamiento", "PRP"),
+    ("cat_Tratamiento", "Hilos"),
+    ("cat_Tratamiento", "Limpieza Facial"),
+    ("cat_Tratamiento", "Exosoma / Vtech"),
+    ("cat_Tratamiento", "Esperma de Salmón"),
+    ("cat_Tratamiento", "Vitamina C / Cóctel de vida"),
+    ("cat_Tratamiento", "Ozono"),
+    ("cat_Tratamiento", "Autohemoterapia"),
+    ("cat_Tratamiento", "Infiltración"),
+    ("cat_Tratamiento", "Bioestimuladores"),
+    ("cat_Tratamiento", "Rinomodelación con Ac. Hialurónico"),
+    ("cat_Tratamiento", "Bléfaroplastia"),
+    ("cat_Tratamiento", "Cauterización"),
+    ("cat_Tratamiento", "Lifting Facial"),
+    ("cat_Tratamiento", "Microblending"),
+    ("cat_Tratamiento", "Pigmentación de Labios"),
+    ("cat_Tratamiento", "Retiro de Lipoma"),
+    ("cat_Tratamiento", "Subcisión con PRP"),
+    ("cat_Producto",    "Bloqueador"),
+    ("cat_Producto",    "Hidratante Forte"),
+    ("cat_Producto",    "Jabón"),
+    ("cat_Producto",    "Shampoo"),
+    ("cat_Producto",    "Loción"),
+    ("cat_Producto",    "Exfoliante"),
+    ("cat_Producto",    "Mascarilla"),
+    ("cat_Producto",    "Vitamina C Sérum"),
+    ("cat_Certificado", "Certificado Médico"),
+    ("area",            "Facial"),
+    ("area",            "Cuello"),
+    ("area",            "Escote"),
+    ("area",            "Manos"),
+    ("area",            "Brazos"),
+    ("area",            "Abdomen"),
+    ("area",            "Piernas"),
+    ("area",            "Espalda"),
+]
+
 def get_gspread_client():
     global _gspread_client_cache
     if _gspread_client_cache is not None:
@@ -78,6 +125,24 @@ def get_or_create_worksheet(spreadsheet, nombre, encabezados):
         ws = spreadsheet.add_worksheet(title=nombre, rows=2000, cols=max(len(encabezados), 20))
         ws.append_row(encabezados)
     return ws
+
+def get_listas_sheet():
+    """Retorna la hoja Listas, creándola con valores por defecto si no existe."""
+    global _spreadsheet_cache, _worksheets_cache
+    client = get_gspread_client()
+    if _spreadsheet_cache is None:
+        _spreadsheet_cache = client.open_by_key(SHEET_ID)
+    spreadsheet = _spreadsheet_cache
+    if "listas" not in _worksheets_cache:
+        try:
+            ws = spreadsheet.worksheet("Listas")
+        except gspread.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title="Listas", rows=300, cols=5)
+            ws.append_row(ENCABEZADOS_LISTAS)
+            for lista, valor in LISTAS_DEFAULT:
+                ws.append_row([lista, valor])
+        _worksheets_cache["listas"] = ws
+    return _worksheets_cache["listas"]
 
 def get_sheets():
     global _spreadsheet_cache, _worksheets_cache
@@ -1000,6 +1065,23 @@ def api_dashboard():
         "deudores_aging":     deudores_aging,
         "pendientes_cobro":   pendientes_cobro,
     })
+
+@app.route("/api/config")
+def api_config():
+    """Devuelve los tipos, categorías y áreas configurados en la hoja Listas."""
+    try:
+        ws   = get_listas_sheet()
+        rows = _get_cached_values(ws, "listas")
+        config = {}
+        for row in rows[1:]:
+            if len(row) < 2 or not row[0].strip() or not row[1].strip():
+                continue
+            key = row[0].strip()
+            val = row[1].strip()
+            config.setdefault(key, []).append(val)
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/ping")
 def ping():

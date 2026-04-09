@@ -292,6 +292,7 @@
 
             <div class="seccion">Servicios / Productos</div>
 
+            <datalist id="areas-datalist"></datalist>
             <div id="items-container"></div>
 
             <input type="hidden" name="num_items" id="num_items" value="0">
@@ -890,27 +891,13 @@ const CLIENTES_CODIGOS = {{ clientes_codigos | tojson }};
 const CLIENTES_DATA    = {{ clientes_data    | tojson }};
 const NEXT_CLIENT_NUM  = {{ next_client_num }};
 
-const CATEGORIAS_POR_TIPO = {
-    'Tratamiento': [
-        'Botox', 'Ácido Hialurónico', 'PRP', 'Hilos', 'Limpieza Facial',
-        'Exosoma / Vtech', 'Esperma de Salmón', 'Vitamina C / Cóctel de vida',
-        'Ozono', 'Autohemoterapia', 'Infiltración', 'Bioestimuladores',
-        'Rinomodelación con Ac. Hialurónico', 'Bléfaroplastia', 'Cauterización',
-        'Lifting Facial', 'Microblending', 'Pigmentación de Labios',
-        'Retiro de Lipoma', 'Subcisión con PRP'
-    ],
-    'Producto': [
-        'Bloqueador', 'Hidratante Forte', 'Jabón', 'Shampoo',
-        'Loción', 'Exfoliante', 'Mascarilla', 'Vitamina C Sérum'
-    ],
-    'Certificado': ['Certificado Médico'],
-    'Otros': []
-};
+// Configuración dinámica cargada desde Google Sheets (hoja "Listas")
+let APP_CONFIG = { tipos: [], categorias: {}, areas: [] };
 
 function actualizarCategorias(tipoSelect, idx) {
     const tipo = tipoSelect.value;
     const catSelect = document.querySelector(`[name="categoria_${idx}"]`);
-    const cats = CATEGORIAS_POR_TIPO[tipo] || [];
+    const cats = APP_CONFIG.categorias[tipo] || [];
 
     let html = '<option value="">— Seleccionar —</option>';
     cats.forEach(c => { html += `<option value="${c}">${c}</option>`; });
@@ -919,12 +906,43 @@ function actualizarCategorias(tipoSelect, idx) {
     }
     catSelect.innerHTML = html;
 
-    // Si solo hay una opción, seleccionarla automáticamente
     if (cats.length === 1) catSelect.value = cats[0];
 
-    // Reset campo libre
     const otroWrap = document.getElementById(`otro-wrap-${idx}`);
     if (otroWrap) otroWrap.style.display = 'none';
+}
+
+function buildTipoOptions() {
+    let html = '<option value="">— Seleccionar —</option>';
+    APP_CONFIG.tipos.forEach(t => { html += `<option value="${t}">${t}</option>`; });
+    return html;
+}
+
+function cargarConfig() {
+    return fetch('/api/config').then(r => r.json()).then(data => {
+        APP_CONFIG.tipos = data['tipo'] || [];
+        APP_CONFIG.areas = data['area'] || [];
+        APP_CONFIG.categorias = {};
+        Object.keys(data).forEach(k => {
+            if (k.startsWith('cat_')) {
+                const tipo = k.replace('cat_', '');
+                APP_CONFIG.categorias[tipo] = data[k];
+            }
+        });
+        // Actualizar datalist de áreas
+        const dl = document.getElementById('areas-datalist');
+        if (dl) {
+            dl.innerHTML = APP_CONFIG.areas.map(a => `<option value="${a}">`).join('');
+        }
+        // Actualizar selects de tipo ya renderizados
+        document.querySelectorAll('[name^="tipo_"]').forEach(sel => {
+            const valActual = sel.value;
+            sel.innerHTML = buildTipoOptions();
+            if (valActual) sel.value = valActual;
+        });
+    }).catch(() => {
+        // Fallback silencioso: el formulario seguirá funcionando sin opciones
+    });
 }
 
 function parseToInputDate(val) {
@@ -1097,11 +1115,7 @@ function agregarItem() {
         <div class="field">
             <label>Tipo *</label>
             <select name="tipo_${i}" onchange="actualizarCategorias(this, ${i})" required>
-                <option value="">— Seleccionar —</option>
-                <option value="Tratamiento">Tratamiento</option>
-                <option value="Producto">Producto</option>
-                <option value="Certificado">Certificado</option>
-                <option value="Otros">Otros</option>
+                ${buildTipoOptions()}
             </select>
         </div>
         <div class="field">
@@ -1116,7 +1130,7 @@ function agregarItem() {
         </div>
         <div class="field">
             <label>Zona / Cantidad / Envase</label>
-            <input type="text" name="zona_${i}" placeholder="Ej: 3 Superior, 2 und...">
+            <input type="text" name="zona_${i}" placeholder="Ej: 3 Superior, 2 und..." list="areas-datalist">
         </div>
         <div class="field">
             <label>Precio de Venta</label>
@@ -2338,7 +2352,7 @@ document.querySelectorAll('form').forEach(form => {
 });
 
 // Cargar primer ítem al iniciar
-agregarItem();
+cargarConfig().then(() => agregarItem());
 </script>
 </body>
 </html>
