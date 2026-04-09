@@ -1178,7 +1178,18 @@ function agregarItem() {
                 </label>
             </div>
             <div id="promo-campos-${i}" style="display:none;">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+                    <!-- Opción Gratis -->
+                    <div style="display:flex;align-items:center;gap:6px;padding-bottom:10px;">
+                        <input type="checkbox" id="es_gratis_${i}" onchange="marcarGratis(${i})"
+                               style="width:16px;height:16px;accent-color:#C0392B;flex-shrink:0;">
+                        <label for="es_gratis_${i}" style="font-size:13px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;white-space:nowrap;">
+                            Gratis
+                        </label>
+                    </div>
+                    <!-- Separador -->
+                    <div style="font-size:12px;color:#ccc;padding-bottom:12px;">|</div>
+                    <!-- Descuento -->
                     <div class="field" style="margin:0;flex:1;min-width:120px;">
                         <label style="font-size:11px;">Descuento S/</label>
                         <input type="number" id="descuento_input_${i}"
@@ -1186,15 +1197,8 @@ function agregarItem() {
                                oninput="calcularDescuento(${i})"
                                style="width:100%;box-sizing:border-box;">
                     </div>
-                    <div style="display:flex;align-items:center;gap:6px;padding-top:18px;">
-                        <input type="checkbox" id="es_gratis_${i}" onchange="marcarGratis(${i})"
-                               style="width:15px;height:15px;accent-color:#C0392B;">
-                        <label for="es_gratis_${i}" style="font-size:12px;color:#C0392B;font-weight:bold;cursor:pointer;margin:0;">
-                            Gratis
-                        </label>
-                    </div>
                 </div>
-                <div id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;margin-top:6px;font-weight:bold;"></div>
+                <div id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;margin-top:4px;font-weight:bold;"></div>
             </div>
         </div>
     `;
@@ -1274,11 +1278,14 @@ function marcarGratis(i) {
     const precioOrig = document.getElementById(`precio_orig_${i}`);
 
     if (checked) {
-        if (dcInput) dcInput.value = '';
-        if (dc) dc.value = lista; // descuento = precio total
+        // Deshabilitar input de descuento
+        if (dcInput) { dcInput.value = ''; dcInput.disabled = true; dcInput.style.opacity = '0.4'; }
+        if (dc) dc.value = lista;
         if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">GRATIS — descuento total S/ ${lista}</span>`;
         if (precioOrig) { precioOrig.value = 0; actualizarPrecioItem(i); }
     } else {
+        // Rehabilitar input de descuento
+        if (dcInput) { dcInput.disabled = false; dcInput.style.opacity = '1'; }
         if (dc) dc.value = '';
         if (res) res.innerHTML = '';
         if (precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
@@ -1385,6 +1392,7 @@ function actualizarPrecioItem(idx) {
     }
     if (hidden) hidden.value = precioSoles;
     actualizarResumen();
+    autoRellenarPorPago();
 }
 
 // ── Resumen y distribución ────────────────────────────────────────────────────
