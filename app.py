@@ -75,25 +75,31 @@ def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos="", email
     clientes_ws.append_row([codigo, nombre.strip(), telefono, cumpleanos, str(date.today()), email])
     return codigo
 
-def get_next_item_code(ventas_ws, tipo):
-    """Genera el siguiente código LIVTRAT#### o LIVPROD####."""
+def get_max_codigos(ventas_ws):
+    """Lee la hoja UNA sola vez y retorna el máximo numérico actual de cada prefijo."""
+    todos = ventas_ws.get_all_values()
+    maximos = {"LIVTRAT": 0, "LIVPROD": 0}
+    for fila in todos[1:]:
+        if len(fila) > 6:
+            cod = str(fila[6]).strip()
+            for prefix in maximos:
+                if cod.startswith(prefix):
+                    try:
+                        maximos[prefix] = max(maximos[prefix], int(cod[len(prefix):]))
+                    except ValueError:
+                        pass
+    return maximos
+
+def get_next_item_code(tipo, maximos, contadores):
+    """Genera el siguiente código único usando contadores en memoria (sin releer la hoja)."""
     if tipo in ("Tratamiento", "Certificado"):
         prefix = "LIVTRAT"
     elif tipo == "Producto":
         prefix = "LIVPROD"
     else:
         prefix = "LIVTRAT"
-    todos = ventas_ws.get_all_values()
-    max_num = 0
-    for fila in todos[1:]:
-        # COD_ITEM está en índice 6
-        if len(fila) > 6 and str(fila[6]).startswith(prefix):
-            try:
-                num = int(fila[6][len(prefix):])
-                max_num = max(max_num, num)
-            except ValueError:
-                pass
-    return f"{prefix}{max_num + 1:04d}"
+    contadores[prefix] = contadores.get(prefix, maximos.get(prefix, 0)) + 1
+    return f"{prefix}{contadores[prefix]:04d}"
 
 def siguiente_numero(sheet):
     todos = sheet.get_all_values()
@@ -205,6 +211,10 @@ def guardar_venta():
         total_contratado = 0.0
 
         # ── Fase 1: preparar todos los ítems con sus códigos ──────────────────
+        # Leer máximos UNA sola vez y usar contadores en memoria para evitar duplicados
+        maximos_cod   = get_max_codigos(ventas)
+        contadores_cod = {}
+
         items_prep = []
         for i in range(num_items):
             tipo = request.form.get(f"tipo_{i}", "")
@@ -221,10 +231,8 @@ def guardar_venta():
             debe_item    = max(0.0, precio_soles - pago_item)
             total_contratado += precio_soles
 
-            if tipo in ("Tratamiento", "Certificado"):
-                cod_item = get_next_item_code(ventas, "Tratamiento")
-            elif tipo == "Producto":
-                cod_item = get_next_item_code(ventas, "Producto")
+            if tipo in ("Tratamiento", "Certificado", "Producto"):
+                cod_item = get_next_item_code(tipo, maximos_cod, contadores_cod)
             else:
                 cod_item = ""
 
