@@ -1,4 +1,52 @@
-flask
-gspread
-google-auth
-gunicorn
+# ============================================================================
+# Dependencias de formulario-livskin (PINNEADAS)
+# ============================================================================
+# IMPORTANTE: Todas las versiones están fijadas con `==` para garantizar
+# reproducibilidad. Si Render reinstala dependencias mañana, dentro de 6 meses
+# o dentro de 3 años, va a obtener EXACTAMENTE las mismas versiones que están
+# funcionando hoy en producción.
+#
+# Generado desde el venv local (Python 3.14.4) el 2026-04-11.
+# Pinneado para correr en Python 3.13.13 (ver runtime.txt) — la última patch
+# estable de la serie 3.13, en fase bugfix activa hasta oct 2027 y security
+# hasta oct 2029. Cubre el horizonte de 3 años del proyecto con margen.
+#
+# Para actualizar: nunca con `pip install -U`. Hacerlo manualmente, una
+# dependencia a la vez, probando en local y verificando que el dashboard sigue
+# cuadrando antes de subir.
+# ============================================================================
+
+# --- Dependencias directas (las que importa el código) ---
+Flask==3.1.3
+gspread==6.2.1
+google-auth==2.49.1
+gunicorn==25.3.0
+
+# --- Transitivas críticas (pinneadas para evitar sorpresas) ---
+google-auth-oauthlib==1.3.1
+requests==2.33.1
+requests-oauthlib==2.0.0
+urllib3==2.6.3
+certifi==2026.2.25
+charset-normalizer==3.4.7
+idna==3.11
+
+# --- Cadena Flask ---
+Werkzeug==3.1.8
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+itsdangerous==2.2.0
+click==8.3.2
+blinker==1.9.0
+colorama==0.4.6
+
+# --- Cadena Google Auth / Crypto ---
+cryptography==46.0.6
+cffi==2.0.0
+pycparser==3.0
+pyasn1==0.6.3
+pyasn1_modules==0.4.2
+oauthlib==3.3.1
+
+# --- Otros ---
+packaging==26.0

@@ -1,7 +1,54 @@
+# ============================================================================
+# .gitignore — formulario-livskin
+# ============================================================================
+
+# --- Credenciales y secretos (NUNCA commitear) ---
+.env
+.env.*
+!.env.example
+livskin-formulario-*.json
+*credentials*.json
+*service-account*.json
+*.pem
+*.key
+
+# --- Entornos virtuales de Python ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Cache de Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Backups locales ---
+*.zip
+*.tar.gz
+*.bak
+
+# --- Editores e IDEs ---
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# --- Datos sensibles (NUNCA commitear) ---
+# Archivos de datos de pacientes / históricos. Mantener fuera de git.
+Inventario*.csv
+*pacientes*.csv
+*clientes*.csv
+datos_*.csv
+
+# --- Legacy (archivos viejos del proyecto que ya no existen) ---
 Datos_Livskin.xlsx
 formulario_livskin.py
 formulario_livskin.pyw
-__pycache__/
-*.pyc
-.env
-*.json

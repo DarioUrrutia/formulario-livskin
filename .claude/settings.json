@@ -1,11 +1,18 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(py -c ':*)",
-      "Bash(py \"C:/Users/JeanUrrutia/ProyectosClaude/setup_acceso.py\")",
-      "Bash(py -m pip install gspread google-auth -q)",
-      "Bash(py app.py)",
-      "Bash(py -c \"from app import app; print\\('OK'\\)\")"
+    "allow": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py tools/sync_claude_plans.py --quiet"
+          }
+        ]
+      }
     ]
   }
 }

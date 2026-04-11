@@ -1,12 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(py -c \"import os; os.remove\\(r'C:\\\\Users\\\\JeanUrrutia\\\\ProyectosClaude\\\\Formulario Livskin.xlsx'\\); print\\('Eliminado'\\)\")",
-      "Bash(py \"C:/Users/JeanUrrutia/ProyectosClaude/crear_formulario.py\")",
-      "Bash(py -c \"import os; files = os.listdir\\(r'C:\\\\Users\\\\JeanUrrutia\\\\ProyectosClaude'\\); print\\('\\\\n'.join\\(files\\)\\)\")",
-      "Bash(py -c \"import os; os.system\\('taskkill /IM EXCEL.EXE /F'\\)\")",
-      "Bash(py -c ':*)",
-      "Bash(py formulario_livskin.py)"
-    ]
+    "allow": []
   }
 }
