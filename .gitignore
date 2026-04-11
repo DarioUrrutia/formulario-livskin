@@ -48,6 +48,12 @@ Inventario*.csv
 *clientes*.csv
 datos_*.csv
 
+# --- Cache local del sync de planes de Claude ---
+# tools/sync_claude_plans.py copia aquí planes desde ~/.claude/plans/.
+# Es contenido derivado/cacheado, no fuente de verdad. Los planes "buenos"
+# viven en docs/plans/ con nombre descriptivo (regla R2 de CLAUDE.md).
+docs/plans/_synced/
+
 # --- Legacy (archivos viejos del proyecto que ya no existen) ---
 Datos_Livskin.xlsx
 formulario_livskin.py
