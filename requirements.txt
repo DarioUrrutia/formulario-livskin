@@ -7,9 +7,9 @@
 # funcionando hoy en producción.
 #
 # Generado desde el venv local (Python 3.14.4) el 2026-04-11.
-# Pinneado para correr en Python 3.13.13 (ver runtime.txt) — la última patch
-# estable de la serie 3.13, en fase bugfix activa hasta oct 2027 y security
-# hasta oct 2029. Cubre el horizonte de 3 años del proyecto con margen.
+# Pinneado para correr en Python 3.13.13 (ver .python-version) — la última
+# patch estable de la serie 3.13, en fase bugfix activa hasta oct 2027 y
+# security hasta oct 2029. Cubre el horizonte de 3 años del proyecto con margen.
 #
 # Para actualizar: nunca con `pip install -U`. Hacerlo manualmente, una
 # dependencia a la vez, probando en local y verificando que el dashboard sigue

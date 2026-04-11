@@ -32,7 +32,7 @@
 | Cache | En memoria por proceso, TTL 90 s, invalidación automática tras escrituras |
 | Keep-alive | Endpoint `/ping` + cron-job.org cada 14 min (evita cold start de Render) |
 
-Todas las versiones están **pinneadas** en [requirements.txt](requirements.txt). Python en [runtime.txt](runtime.txt).
+Todas las versiones están **pinneadas** en [requirements.txt](requirements.txt). Python en [.python-version](.python-version) (formato que Render respeta automáticamente; el viejo `runtime.txt` de Heroku NO funciona en Render moderno).
 
 ---
 
@@ -160,7 +160,7 @@ formulario-livskin/
 │   │   └── _synced/             # Sync automático del hook (no editar a mano)
 │   └── runbooks/                # Procedimientos de emergencia
 ├── requirements.txt             # Dependencias PINNEADAS con ==
-├── runtime.txt                  # Python 3.13.13
+├── .python-version              # Python 3.13.13 (Render lo respeta)
 ├── render.yaml                  # Configuración de Render (gunicorn --config gunicorn.conf.py)
 ├── .env.example                 # Template de variables de entorno
 ├── .gitignore

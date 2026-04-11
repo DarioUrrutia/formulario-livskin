@@ -99,8 +99,10 @@ Este documento tiene cuatro objetivos:
 
 - [ ] Renovar dominio si aplica (actualmente `*.onrender.com` no requiere renovación).
 - [ ] Revisar el plan de Render: ¿sigue gratuito? ¿conviene migrar a paid ($7/mes) para evitar cold starts?
-- [ ] Revisar versión de Python: Render puede deprecar versiones (ej. Python 3.8 → 3.11 → 3.12).
-      Verificar `python_version` en `render.yaml` o agregar `runtime.txt`.
+- [ ] Revisar versión de Python: Render puede deprecar versiones cada año.
+      Verificar `.python-version` en la raíz del repo (no `runtime.txt` — Render moderno
+      no lo usa). Confirmar también la env var `PYTHON_VERSION` en el dashboard de Render
+      como cinturón y tirantes (env var tiene precedencia sobre el archivo).
 - [ ] Auditoría de seguridad: ¿alguna dependencia con CVE? `pip-audit` o `safety check`.
 - [ ] Revisar este documento y actualizarlo.
 

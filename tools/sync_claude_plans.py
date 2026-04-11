@@ -244,12 +244,17 @@ def sync_plans(verbose: bool = False) -> dict:
     docs_plans_dir.mkdir(parents=True, exist_ok=True)
 
     def file_hash(p: Path) -> str | None:
+        """
+        SHA-256 normalizando line endings (CRLF -> LF) para que un archivo
+        guardado en Windows con CRLF de el mismo hash que el mismo archivo en
+        Unix con LF. Esto es importante porque git en Windows convierte
+        automaticamente LF -> CRLF al checkout (controlado por core.autocrlf),
+        lo que cambiaria el hash si no normalizaramos. Los planes son chicos
+        (~30 KB), cargar el archivo entero a memoria es trivial.
+        """
         try:
-            h = hashlib.sha256()
-            with p.open("rb") as f:
-                for chunk in iter(lambda: f.read(8192), b""):
-                    h.update(chunk)
-            return h.hexdigest()
+            content = p.read_bytes().replace(b"\r\n", b"\n")
+            return hashlib.sha256(content).hexdigest()
         except OSError:
             return None
 
