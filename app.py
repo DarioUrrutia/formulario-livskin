@@ -238,20 +238,30 @@ def obtener_clientes(sheet_ventas):
 
 @app.route("/actualizar-headers")
 def actualizar_headers():
+    """
+    Actualiza la fila de cabecera de todas las hojas al esquema actual del código.
+    Ejecutar cada vez que se agreguen columnas nuevas al sistema.
+    GET http://localhost:5000/actualizar-headers
+    """
     try:
         client = get_gspread_client()
         spreadsheet = client.open_by_key(SHEET_ID)
-        for nombre, enc in [
+        hojas = [
             ("Ventas",   ENCABEZADOS_VENTAS),
-            ("Pagos",   ENCABEZADOS_PAGOS),
+            ("Pagos",    ENCABEZADOS_PAGOS),
+            ("Gastos",   ENCABEZADOS_GASTOS),
             ("Clientes", ENCABEZADOS_CLIENTES),
-        ]:
+        ]
+        resultados = []
+        for nombre, enc in hojas:
             try:
                 ws = spreadsheet.worksheet(nombre)
                 ws.update('A1', [enc])
+                resultados.append(f"✓ {nombre}: {len(enc)} columnas")
             except Exception as e:
-                pass
-        return "Headers actualizados correctamente."
+                resultados.append(f"✗ {nombre}: {e}")
+        _invalidate_cache()
+        return "<br>".join(["<b>Headers actualizados:</b>"] + resultados)
     except Exception as e:
         return f"Error: {e}"
 
