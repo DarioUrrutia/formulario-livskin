@@ -248,7 +248,7 @@
 
     <!-- ═══════════════════════════════════════════════════════ TAB: VENTA -->
     <div id="tab-venta" class="tab-content form-body">
-        <form method="POST" action="/venta">
+        <form method="POST" action="/venta" onsubmit="return validarPreciosFormulario()">
 
             <div class="seccion">Cliente</div>
             <div class="field">
@@ -377,6 +377,11 @@
 
                 </div><!-- /seccion-como-paga -->
 
+                <!-- Aviso deuda total — aparece cuando pagadoHoy = 0 y hay ítems con precio -->
+                <div id="aviso-todo-deuda" style="display:none;margin:8px 0 12px;padding:10px 12px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px;color:#856404;">
+                    ⚠ No hay monto de pago ingresado — esta venta quedará <strong>completamente como deuda</strong> pendiente de cobro.
+                </div>
+
                 <div class="seccion">Distribución por ítem</div>
                 <div style="font-size:11px;color:#888;margin-bottom:10px;">Asigna de lo que paga hoy, cuánto va para cada ítem. El sistema te muestra en tiempo real cuánto te queda por asignar.</div>
                 <div id="tabla-dist-items"></div>
@@ -392,7 +397,7 @@
             <input type="hidden" name="num_deudas" id="num_deudas_venta" value="0">
             <div id="deuda-hidden-fields"></div>
 
-            <button type="submit">GUARDAR VENTA</button>
+            <button type="submit" id="btn-guardar-venta">GUARDAR VENTA</button>
         </form>
     </div>
 
@@ -1148,7 +1153,7 @@ function agregarItem() {
                 </select>
                 <input type="number" name="precio_orig_${i}" id="precio_orig_${i}"
                        placeholder="0" step="1" min="0"
-                       oninput="actualizarPrecioItem(${i})"
+                       oninput="onPrecioOrigInput(${i})"
                        style="flex:1;">
             </div>
             <!-- Campo T.C. (solo para USD/EUR) -->
@@ -1191,10 +1196,12 @@ function agregarItem() {
                    style="width:90px;padding:7px 8px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;display:none;">
             <span id="promo-resumen-${i}" style="font-size:12px;color:#C0392B;font-weight:bold;"></span>
         </div>
+        <div id="notif-promo-${i}" style="display:none;margin-top:6px;"></div>
     `;
     container.appendChild(div);
     document.getElementById('num_items').value = itemCount;
     actualizarResumen();
+    validarPreciosFormulario();
 }
 
 function eliminarItem(i) {
@@ -1202,14 +1209,177 @@ function eliminarItem(i) {
     if (el) el.remove();
     delete pagosPorItem[i];
     actualizarResumen();
+    validarPreciosFormulario();
+}
+
+// ── Reset y validación de precio obligatorio ──────────────────────────────────
+
+function resetPromoItem(i) {
+    const gratisChk = document.getElementById(`es_gratis_${i}`);
+    const flagEl    = document.getElementById(`es_gratis_flag_${i}`);
+    const descChk   = document.getElementById(`tiene_desc_${i}`);
+    const dcInput   = document.getElementById(`descuento_input_${i}`);
+    const dc        = document.getElementById(`descuento_${i}`);
+    const pl        = document.getElementById(`precio_lista_${i}`);
+    const res       = document.getElementById(`promo-resumen-${i}`);
+    if (gratisChk) gratisChk.checked = false;
+    if (flagEl)    flagEl.value = '0';
+    if (descChk)   descChk.checked = false;
+    if (dcInput)   { dcInput.style.display = 'none'; dcInput.value = ''; }
+    if (dc)        dc.value = '';
+    if (pl)        pl.value = '';
+    if (res)       res.innerHTML = '';
+    const notif = document.getElementById(`notif-promo-${i}`);
+    if (notif)     { notif.innerHTML = ''; notif.style.display = 'none'; }
+}
+
+function resetPagosYDistribucion() {
+    ['ef-efectivo', 'ef-yape', 'ef-plin', 'ef-giro'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    for (let i = 0; i < itemCount; i++) {
+        const el = document.getElementById(`pago_item_${i}`);
+        if (el) el.value = '';
+        pagosPorItem[i] = 0;
+    }
+    deudasPendientesCliente.forEach((d, idx) => {
+        const el = document.getElementById(`deuda-monto-${idx}`);
+        if (el) el.value = '';
+        deudasPagos[idx] = 0;
+    });
+}
+
+function onPrecioOrigInput(idx) {
+    const tieneGratis = document.getElementById(`es_gratis_${idx}`)?.checked;
+    const tieneDesc   = document.getElementById(`tiene_desc_${idx}`)?.checked;
+
+    if (tieneGratis || tieneDesc) {
+        // Hay promo activa: recalcular total_item con el nuevo precio pero sin tocar la promo
+        const precioOrig = parseFloat(document.getElementById(`precio_orig_${idx}`)?.value || 0);
+        const moneda     = document.getElementById(`moneda_item_${idx}`)?.value || 'Soles';
+        const tc         = parseFloat(document.getElementById(`tc_item_${idx}`)?.value || 0);
+        const precioSoles = moneda === 'Soles' ? precioOrig : (tc > 0 ? Math.round(precioOrig * tc) : 0);
+        const hidden     = document.getElementById(`total_item_${idx}`);
+
+        if (tieneGratis) {
+            if (hidden) hidden.value = '0';
+            const res = document.getElementById(`promo-resumen-${idx}`);
+            if (res) res.innerHTML = `<span style="color:#27ae60;font-weight:bold;">✓ GRATIS — precio de lista S/ ${precioOrig}</span>`;
+        } else {
+            const desc    = parseFloat(document.getElementById(`descuento_${idx}`)?.value || 0);
+            const cobrado = Math.max(0, precioSoles - desc);
+            if (hidden) hidden.value = cobrado;
+            const pct = precioSoles > 0 ? Math.round((desc / precioSoles) * 100) : 0;
+            const res = document.getElementById(`promo-resumen-${idx}`);
+            if (res) res.innerHTML = desc > 0
+                ? `→ paga <strong>S/ ${cobrado}</strong> <span style="color:#888;">(−${pct}%)</span>`
+                : '';
+        }
+        mostrarNotificacionPromo(idx, tieneGratis, precioSoles);
+    } else {
+        resetPagosYDistribucion();
+        actualizarPrecioItem(idx);
+    }
+    validarPreciosFormulario();
+    actualizarResumen();
+    autoRellenarPorPago();
+}
+
+function mostrarNotificacionPromo(idx, esGratis, precioSoles) {
+    const notif = document.getElementById(`notif-promo-${idx}`);
+    if (!notif) return;
+    let texto = '';
+    if (esGratis) {
+        texto = `Precio cambiado. ¿Mantener este ítem como <strong>Gratis</strong>?`;
+    } else {
+        const desc    = parseFloat(document.getElementById(`descuento_${idx}`)?.value || 0);
+        const cobrado = Math.max(0, precioSoles - desc);
+        texto = `Precio cambiado. ¿Mantener el descuento de <strong>S/ ${desc}</strong>? → cobrarías S/ ${cobrado}`;
+    }
+    const btnCambiar = !esGratis ? `
+                <button type="button" onclick="cambiarDescuento(${idx})"
+                    style="padding:4px 10px;background:#e67e22;color:white;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:bold;">
+                    ✎ Cambiar descuento
+                </button>` : '';
+    notif.innerHTML = `
+        <div style="padding:8px 10px;background:#fff8e1;border:1px solid #ffc107;border-radius:7px;font-size:12px;color:#5d4037;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+            <span>⚠ ${texto}</span>
+            <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+                <button type="button" onclick="confirmarMantenerPromo(${idx})"
+                    style="padding:4px 10px;background:#27ae60;color:white;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:bold;">
+                    ✓ Mantener
+                </button>
+                ${btnCambiar}
+                <button type="button" onclick="quitarPromo(${idx})"
+                    style="padding:4px 10px;background:#e74c3c;color:white;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-weight:bold;">
+                    ✗ Quitar
+                </button>
+            </div>
+        </div>`;
+    notif.style.display = 'block';
+}
+
+function confirmarMantenerPromo(idx) {
+    // Actualizar precio_lista con el nuevo precio para que futuros cálculos de descuento usen la base correcta
+    capturarPrecioLista(idx);
+    const notif = document.getElementById(`notif-promo-${idx}`);
+    if (notif) { notif.innerHTML = ''; notif.style.display = 'none'; }
+}
+
+function cambiarDescuento(idx) {
+    confirmarMantenerPromo(idx);  // actualiza precio_lista y cierra la notif
+    const dcInput = document.getElementById(`descuento_input_${idx}`);
+    if (dcInput) {
+        dcInput.style.display = 'inline-block';
+        dcInput.focus();
+        dcInput.select();
+    }
+}
+
+function quitarPromo(idx) {
+    resetPromoItem(idx);
+    resetPagosYDistribucion();
+    actualizarPrecioItem(idx);
+    actualizarResumen();
+    validarPreciosFormulario();
+}
+
+function validarPreciosFormulario() {
+    let hayError = false;
+    for (let i = 0; i < itemCount; i++) {
+        if (!document.getElementById(`item-${i}`)) continue;
+        const tipo = document.querySelector(`[name="tipo_${i}"]`)?.value || '';
+        if (!tipo) continue;
+        const precioInput = document.getElementById(`precio_orig_${i}`);
+        const precio = parseFloat(precioInput?.value || 0);
+        if (precioInput) {
+            if (!precio || precio <= 0) {
+                precioInput.style.border = '1.5px solid #e74c3c';
+                hayError = true;
+            } else {
+                precioInput.style.border = '1.5px solid #ddd';
+            }
+        }
+    }
+    const btn = document.getElementById('btn-guardar-venta');
+    if (btn) {
+        btn.disabled = hayError;
+        btn.style.opacity = hayError ? '0.5' : '';
+        btn.style.cursor  = hayError ? 'not-allowed' : '';
+    }
+    return !hayError;
 }
 
 // Captura el precio de lista cuando el usuario interactúa con los checkboxes de promo
 function capturarPrecioLista(i) {
-    const pl = document.getElementById(`precio_lista_${i}`);
-    const totalHidden = document.getElementById(`total_item_${i}`);
-    if (pl && totalHidden && !parseFloat(pl.value)) {
-        pl.value = totalHidden.value || 0;
+    const pl       = document.getElementById(`precio_lista_${i}`);
+    const precioOrig = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
+    const moneda   = document.getElementById(`moneda_item_${i}`)?.value || 'Soles';
+    const tc       = parseFloat(document.getElementById(`tc_item_${i}`)?.value || 0);
+    if (pl) {
+        const listaSoles = moneda === 'Soles' ? precioOrig : (tc > 0 ? Math.round(precioOrig * tc) : 0);
+        pl.value = listaSoles;
     }
 }
 
@@ -1257,16 +1427,17 @@ function toggleDescuento(i) {
     const precioOrig = document.getElementById(`precio_orig_${i}`);
 
     if (checked) {
-        // Desmarcar "Gratis"
+        // Desmarcar "Gratis" y resetear su flag
         if (gratis) gratis.checked = false;
+        const flagEl = document.getElementById(`es_gratis_flag_${i}`);
+        if (flagEl) flagEl.value = '0';
         if (dcInput) { dcInput.style.display = 'inline-block'; dcInput.focus(); }
     } else {
         if (dcInput) { dcInput.style.display = 'none'; dcInput.value = ''; }
         if (dc)  dc.value = '';
         if (res) res.innerHTML = '';
-        // Restaurar precio original
-        const lista = parseFloat(pl?.value || 0);
-        if (lista > 0 && precioOrig) { precioOrig.value = lista; actualizarPrecioItem(i); }
+        // Recalcular total_item desde precio_orig intacto — sin tocar lo que el usuario escribió
+        actualizarPrecioItem(i);
     }
 }
 
@@ -1278,17 +1449,35 @@ function calcularDescuento(i) {
     const dc    = document.getElementById(`descuento_${i}`);
     const res   = document.getElementById(`promo-resumen-${i}`);
 
-    const cobrado = Math.max(0, lista - desc);
+    // Validar que el descuento no supere el precio de venta
+    if (lista > 0 && desc >= lista) {
+        if (dcInput) dcInput.style.border = '1.5px solid #e74c3c';
+        if (res) res.innerHTML = `<span style="color:#e74c3c;font-weight:bold;">⚠ El descuento no puede ser mayor o igual al precio de venta (S/ ${lista})</span>`;
+        if (dc) dc.value = '';
+        return;  // no actualizar total_item ni distribución
+    }
+
+    if (dcInput) dcInput.style.border = '1.5px solid #ddd';
+    const cobrado = lista - desc;
     const pct = lista > 0 ? Math.round((desc / lista) * 100) : 0;
 
     if (dc) dc.value = desc;
+    const hidden = document.getElementById(`total_item_${i}`);
+    if (hidden) hidden.value = cobrado;
     if (res) {
         res.innerHTML = desc > 0
             ? `→ paga <strong>S/ ${cobrado}</strong> <span style="color:#888;">(−${pct}%)</span>`
             : '';
     }
-    const precioOrig = document.getElementById(`precio_orig_${i}`);
-    if (precioOrig) { precioOrig.value = cobrado; actualizarPrecioItem(i); }
+    // Si la notificación de precio cambiado estaba visible, ocultarla: el usuario ya tomó acción
+    const notif = document.getElementById(`notif-promo-${i}`);
+    if (notif && notif.style.display !== 'none') {
+        capturarPrecioLista(i);
+        notif.innerHTML = '';
+        notif.style.display = 'none';
+    }
+    actualizarResumen();
+    autoRellenarPorPago();
 }
 
 function toggleOtroItem(sel, i) {
@@ -1416,8 +1605,7 @@ function getItemsData() {
         const moneda    = document.getElementById(`moneda_item_${i}`)?.value || 'Soles';
         const precioOrig  = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
         const tc          = parseFloat(document.getElementById(`tc_item_${i}`)?.value || 0);
-        const esGratis    = document.getElementById(`es_gratis_flag_${i}`)?.value === '1';
-        const precioSoles = esGratis ? 0 : (moneda === 'Soles' ? precioOrig : (tc > 0 ? Math.round(precioOrig * tc) : 0));
+        const precioSoles = parseFloat(document.getElementById(`total_item_${i}`)?.value || 0);
         const sym        = moneda === 'USD' ? 'US$' : (moneda === 'EUR' ? '€' : 'S/');
         const label      = cat || tipo;
         const precioDisplay = moneda === 'Soles'
@@ -1731,6 +1919,12 @@ function actualizarDistribucion() {
     // Campos ocultos para servidor
     document.getElementById('debe-venta').value  = Math.max(0, Math.round(saldoPend));
     document.getElementById('total-venta').value = totalSoles;
+
+    // Aviso deuda total: si hay ítems con precio pero no se ingresó ningún pago
+    const avisoDeuda = document.getElementById('aviso-todo-deuda');
+    if (avisoDeuda) {
+        avisoDeuda.style.display = (pagadoHoy === 0 && totalSoles > 0) ? 'block' : 'none';
+    }
 }
 
 function actualizarMonedaBadges() {} // deprecated, mantenida para compatibilidad
