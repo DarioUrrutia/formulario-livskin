@@ -17,8 +17,12 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
 - **Promociones y descuentos por ítem**: opción `Gratis` o `Descuento S/` directamente en cada ítem
   - **Gratis**: el campo de precio sigue visible como referencia, pero TOTAL = 0; no entra en facturado ni por cobrar; la distribución de pago ignora ese ítem; cualquier pago recibido queda como saldo a favor o cubre deudas anteriores
-  - **Descuento**: precio cobrado = lista − descuento; se registra el monto cedido en `DESCUENTO S/`
+  - **Descuento**: precio cobrado = lista − descuento; se registra el monto cedido en `DESCUENTO S/`; el descuento no puede ser mayor o igual al precio de venta
   - Validación doble (frontend + backend) para garantizar integridad
+- **Precio de venta obligatorio**: no se puede guardar una venta si algún ítem no tiene precio ingresado; el botón GUARDAR VENTA se bloquea y el campo se marca en rojo
+- **Precio de venta estático**: el campo de precio solo lo edita el usuario; el sistema nunca lo modifica automáticamente; todos los cálculos (descuento, gratis, distribución) se derivan de ese valor
+- **Aviso al cambiar precio con promo activa**: si el usuario modifica el precio de un ítem que ya tenía Gratis o Descuento aplicado, aparece un aviso inline con tres opciones: mantener la promo con el nuevo precio, cambiar el valor del descuento (el cursor va directo al campo preseleccionado), o quitar la promo
+- **Aviso venta a deuda**: si no se ingresa ningún monto de pago, aparece un aviso indicando que la venta quedará completamente como deuda pendiente de cobro
 - **Tipos, categorías y áreas dinámicos**: configurables desde la hoja "Listas" de Google Sheets sin tocar código; la hoja se crea automáticamente con valores por defecto al primer uso
 - Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
 - Protección contra doble registro (botón se deshabilita al enviar)
@@ -262,4 +266,6 @@ Incluye:
 - Caché en memoria por proceso gunicorn con TTL de 90 segundos — lecturas de Sheets son rápidas después de la primera
 - El caché se invalida automáticamente después de cada escritura (venta, cobro, gasto)
 - Endpoint `/ping` para keep-alive con cron externo, evita cold start de 30-60s en Render free tier
-- Validación doble en ítems gratis: frontend zeriza `total_item` y respeta el flag en `getItemsData` y `actualizarPrecioItem`; backend fuerza TOTAL = 0 con el flag `es_gratis` + verificación `descuento >= precio_lista`
+- Validación doble en ítems gratis: frontend zeriza `total_item` (sin tocar `precio_orig`); backend fuerza TOTAL = 0 con el flag `es_gratis` + verificación `descuento >= precio_lista`
+- `precio_orig` es el único campo que el usuario controla; `total_item` es el valor calculado que recibe el servidor (0 si gratis, lista−descuento si hay promo, precio_orig en el resto)
+- `getItemsData()` lee `total_item` directamente para la distribución de pagos, evitando desfase cuando hay descuentos activos
