@@ -569,13 +569,15 @@ def guardar_pago():
             return f"LIVPAGO{pago_num[0]:04d}"
 
         filas_guardadas = 0
-        for idx, (cod, monto, cat) in enumerate(zip(cod_items, montos, categorias)):
+        first_saved = True  # los métodos de pago van en la primera fila GUARDADA
+        for cod, monto, cat in zip(cod_items, montos, categorias):
             if not monto or float(monto or 0) <= 0:
                 continue
-            ef = efectivo if idx == 0 else ""
-            ya = yape     if idx == 0 else ""
-            pl = plin     if idx == 0 else ""
-            gi = giro     if idx == 0 else ""
+            ef = efectivo if first_saved else ""
+            ya = yape     if first_saved else ""
+            pl = plin     if first_saved else ""
+            gi = giro     if first_saved else ""
+            first_saved = False
             num = siguiente_numero(pagos)
             pagos.append_row([
                 num, fecha, cod_cliente, nombre_pago,
@@ -625,9 +627,19 @@ def ver_cliente():
     cobrado_total = 0.0
     if len(todos_pagos) > 1:
         headers_c = todos_pagos[0]
+        # Índice de NOTAS para excluir filas de crédito aplicado (transferencia interna)
+        try:
+            idx_notas_p = headers_c.index("NOTAS")
+        except ValueError:
+            idx_notas_p = 9  # posición por defecto
         for fila in todos_pagos[1:]:
             if len(fila) > 3 and fila[3].strip().lower() == nombre:
                 pagos_cliente.append(dict(zip(headers_c, fila)))
+                # Excluir "Crédito aplicado": es transferencia interna, ya se contó
+                # cuando se depositó el crédito original
+                notas_val = fila[idx_notas_p].strip() if idx_notas_p < len(fila) else ""
+                if notas_val == "Crédito aplicado":
+                    continue
                 try:
                     cobrado_total += float(str(fila[4]).replace(",", ".") or 0)
                 except (ValueError, IndexError):

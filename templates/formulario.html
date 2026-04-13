@@ -1034,7 +1034,11 @@ function actualizarCodigoCliente() {
                     (c.CATEGORIA || '').startsWith('CRÉDITO') ||
                     (c.CATEGORIA || '').startsWith('ANTICIPO')
                 );
-                creditoDisponible = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                const _creditoDepVenta = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                const _creditoAplicVenta = d.pagos
+                    .filter(c => (c.NOTAS || '') === 'Crédito aplicado')
+                    .reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                creditoDisponible = Math.max(0, _creditoDepVenta - _creditoAplicVenta);
                 creditoNotas = pagosCredito.map(c => {
                     const nota = (c.CATEGORIA || '').replace(/^CRÉDITO:?\s*/i, '').replace(/^ANTICIPO:?\s*/i, '').trim();
                     return nota || null;
@@ -1978,7 +1982,12 @@ function cargarDeudaCliente() {
                     (c.CATEGORIA || '').startsWith('CRÉDITO') ||
                     (c.CATEGORIA || '').startsWith('ANTICIPO')
                 );
-                const creditoExistente = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                const creditoDepositado = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                // Restar crédito ya aplicado a ítems (filas con NOTAS="Crédito aplicado")
+                const creditoYaAplicado = (data.pagos || [])
+                    .filter(c => (c.NOTAS || '') === 'Crédito aplicado')
+                    .reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                const creditoExistente = Math.max(0, creditoDepositado - creditoYaAplicado);
                 pagosCreditoExistente = creditoExistente;
                 if (creditoExistente > 0.5) {
                     creditoWrap.style.display = 'block';
