@@ -2236,10 +2236,10 @@ function prepararEnvioPago() {
             alert('Selecciona al menos un ítem o ingresa un método de pago.');
             return false;
         }
-        // Pago libre sin referencia a ítems
+        // Pago sin ítems seleccionados → registrar como crédito del cliente
         addHidden('cod_item_pago[]',   '');
         addHidden('monto_item_pago[]', Math.round(totalIngresado));
-        addHidden('categoria_pago[]',  'PAGO GENERAL');
+        addHidden('categoria_pago[]',  'CRÉDITO');
     }
     return true;
 }

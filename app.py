@@ -459,6 +459,33 @@ def guardar_venta():
             ])
 
         # ── Fase 5: registrar crédito aplicado (vinculado al ítem) ───────────
+        # Validar server-side: crédito aplicado no puede exceder el disponible real
+        if credito_aplicado > 0:
+            todos_pagos_val = _get_cached_values(pagos, "pagos")
+            credito_dep = 0.0
+            credito_usado = 0.0
+            if len(todos_pagos_val) > 1:
+                hdr = todos_pagos_val[0]
+                try:
+                    i_cat = hdr.index("CATEGORIA")
+                    i_monto = hdr.index("MONTO")
+                    i_notas = hdr.index("NOTAS")
+                    i_cli = hdr.index("CLIENTE")
+                except ValueError:
+                    i_cat = i_monto = i_notas = i_cli = -1
+                if i_cat >= 0:
+                    for fila in todos_pagos_val[1:]:
+                        if len(fila) <= max(i_cat, i_monto, i_notas, i_cli):
+                            continue
+                        if fila[i_cli].strip().lower() != cliente.strip().lower():
+                            continue
+                        cat_val = fila[i_cat].strip()
+                        if cat_val.startswith("CRÉDITO") or cat_val.startswith("ANTICIPO"):
+                            credito_dep += parse_num(fila[i_monto])
+                        if fila[i_notas].strip() == "Crédito aplicado":
+                            credito_usado += parse_num(fila[i_monto])
+            credito_real = max(0.0, credito_dep - credito_usado)
+            credito_aplicado = min(credito_aplicado, credito_real)
         if credito_aplicado > 0 and items_prep:
             total_items = sum(it["precio"] for it in items_prep) or 1
             credito_restante = credito_aplicado
