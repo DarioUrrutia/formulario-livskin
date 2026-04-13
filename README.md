@@ -30,10 +30,10 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 ### Pestaña Gasto
 - Registro de gastos del negocio: tipo, descripción, destinatario, monto y método de pago
 
-### Pestaña Cobro
+### Pestaña Pagos
 - Registro de cobros independientes sobre ítems con saldo pendiente
 - Búsqueda de cliente y listado de ítems con deuda activa
-- Asignación de monto por ítem con código único `LIVCOBRO####`
+- Asignación de monto por ítem con código único `LIVPAGO####`
 - Métodos de pago: Efectivo, Yape, Plin, Giro
 
 ### Pestaña Cliente
@@ -69,11 +69,11 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
   - Más de 3 meses
   - Cada bucket muestra: cliente, categoría, monto que debe, fecha de venta y días transcurridos
 
-#### Sub-panel Cobros
+#### Sub-panel Pagos
 - Total cobrado y N° de cobros del período
 - Desglose por método: Efectivo, Yape, Plin, Giro (con gráfico donut)
-- Tabla de cobros recientes
-- **Pendientes de cobro por antigüedad**: misma clasificación de buckets que deudores, con detalle por ítem
+- Tabla de pagos recientes
+- **Pendientes de pago por antigüedad**: misma clasificación de buckets que deudores, con detalle por ítem
 
 ---
 
@@ -127,7 +127,7 @@ formulario-livskin/
 | Hoja | Columnas principales |
 |---|---|
 | Ventas | #, FECHA, COD_CLIENTE, CLIENTE, TELEFONO, TIPO, COD_ITEM, CATEGORIA, ZONA, PROXIMA CITA, FECHA_NAC, MONEDA, TOTAL S/ (PEN), EFECTIVO, YAPE, PLIN, GIRO, DEBE, PAGADO, TC, PRECIO LISTA S/, DESCUENTO S/ |
-| Cobros | #, FECHA, COD_CLIENTE, CLIENTE, MONTO, EFECTIVO, YAPE, PLIN, GIRO, NOTAS, COD_ITEM, CATEGORIA, COD_COBRO |
+| Pagos | #, FECHA, COD_CLIENTE, CLIENTE, MONTO, EFECTIVO, YAPE, PLIN, GIRO, NOTAS, COD_ITEM, CATEGORIA, COD_PAGO |
 | Clientes | COD_CLIENTE, NOMBRE, TELEFONO, FECHA_NAC, FECHA_REGISTRO, EMAIL |
 | Gastos | #, FECHA, TIPO, DESCRIPCION, DESTINATARIO, MONTO, METODO DE PAGO |
 | Listas | LISTA, VALOR — configura tipos (`tipo`), categorías (`cat_Tipo`), áreas (`area`), precios de lista (`precio_Categoría`) |
@@ -233,7 +233,7 @@ Abrir http://localhost:5000 — debería cargar el formulario.
    pip freeze | grep -i flask  # ver la nueva versión
    ```
 3. Editar `requirements.txt` y cambiar **solo esa línea** con la nueva versión.
-4. Probar localmente: las 5 tabs sin errores en consola, flujo completo Venta + Cobro + Dashboard.
+4. Probar localmente: las 5 tabs sin errores en consola, flujo completo Venta + Cobro/Pagos + Dashboard.
 5. Si todo OK, commit y push. Render redespliega.
 6. Verificar producción durante 24h antes de actualizar la siguiente.
 

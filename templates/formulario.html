@@ -199,28 +199,28 @@
         .sin-datos { color: #aaa; font-size: 13px; text-align: center; padding: 20px 0; }
         #resultado-cliente { display: none; }
 
-        /* Cobro: tarjetas de ítems pendientes */
-        .cobro-item-card {
+        /* Pago: tarjetas de ítems pendientes */
+        .pago-item-card {
             border: 1.5px solid #eee; border-radius: 8px; padding: 12px 14px;
             margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
         }
-        .cobro-item-card:hover { border-color: #C0392B; background: #fdf8f8; }
-        .cobro-item-card.selected { border-color: #C0392B; background: #fdf4f4; box-shadow: 0 0 0 2px rgba(192,57,43,0.15); }
-        .cobro-item-card .ci-nombre { font-size: 13px; font-weight: bold; color: #333; }
-        .cobro-item-card .ci-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
-        .cobro-item-card .ci-debe { font-size: 16px; font-weight: bold; color: #C0392B; white-space: nowrap; }
-        .cobro-item-card .ci-total { font-size: 10px; color: #aaa; }
+        .pago-item-card:hover { border-color: #C0392B; background: #fdf8f8; }
+        .pago-item-card.selected { border-color: #C0392B; background: #fdf4f4; box-shadow: 0 0 0 2px rgba(192,57,43,0.15); }
+        .pago-item-card .ci-nombre { font-size: 13px; font-weight: bold; color: #333; }
+        .pago-item-card .ci-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+        .pago-item-card .ci-debe { font-size: 16px; font-weight: bold; color: #C0392B; white-space: nowrap; }
+        .pago-item-card .ci-total { font-size: 10px; color: #aaa; }
 
         /* Historial por día */
         .dia-block { border: 1px solid #eee; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
         .dia-header { background: #f5f5f5; padding: 8px 12px; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #eee; }
         .dia-seccion-lbl { padding: 7px 12px 2px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #C0392B; }
-        .dia-seccion-lbl.cobro-lbl { color: #27ae60; }
+        .dia-seccion-lbl.pago-lbl { color: #27ae60; }
         .dia-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 12px 6px; border-bottom: 1px solid #fafafa; font-size: 13px; }
         .dia-concepto { flex: 1; color: #333; line-height: 1.4; }
         .dia-cod { font-size: 10px; color: #bbb; margin-left: 4px; }
         .dia-monto { font-weight: bold; color: #333; white-space: nowrap; margin-left: 8px; }
-        .dia-monto.cobro { color: #27ae60; }
+        .dia-monto.pago { color: #27ae60; }
         .dia-footer { background: #fafafa; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; border-top: 1px solid #eee; flex-wrap: wrap; gap: 4px; }
     </style>
 </head>
@@ -241,7 +241,7 @@
     <div class="tabs">
         <button class="tab-btn" data-tab="venta"     onclick="cambiarTab('venta')">Venta</button>
         <button class="tab-btn" data-tab="gasto"     onclick="cambiarTab('gasto')">Gasto</button>
-        <button class="tab-btn" data-tab="cobro"     onclick="cambiarTab('cobro')">Cobro</button>
+        <button class="tab-btn" data-tab="pagos"     onclick="cambiarTab('pagos')">Pagos</button>
         <button class="tab-btn" data-tab="cliente"   onclick="cambiarTab('cliente')">Cliente</button>
         <button class="tab-btn" data-tab="dashboard" onclick="cambiarTab('dashboard')">Dashboard</button>
     </div>
@@ -452,67 +452,67 @@
         </form>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════ TAB: COBRO -->
-    <div id="tab-cobro" class="tab-content form-body">
-        <form method="POST" action="/cobro" id="form-cobro" onsubmit="return prepararEnvioCobro()">
+    <!-- ═══════════════════════════════════════════════════════ TAB: PAGOS -->
+    <div id="tab-pagos" class="tab-content form-body">
+        <form method="POST" action="/pagos" id="form-pago" onsubmit="return prepararEnvioPago()">
 
             <div class="seccion">Cliente</div>
             <div class="field">
                 <label>Cliente *</label>
-                <input type="text" name="cliente_cobro" id="input-cliente-cobro" placeholder="Nombre del paciente" required
-                       list="lista-clientes-cobro" oninput="cargarDeudaCliente()">
-                <datalist id="lista-clientes-cobro">
+                <input type="text" name="cliente_pago" id="input-cliente-pago" placeholder="Nombre del paciente" required
+                       list="lista-clientes-pago" oninput="cargarDeudaCliente()">
+                <datalist id="lista-clientes-pago">
                     {% for c in clientes %}<option value="{{ c }}">{% endfor %}
                 </datalist>
             </div>
 
             <!-- Ítems pendientes con multi-selección -->
-            <div id="cobro-deuda-wrap" style="display:none;">
+            <div id="pago-deuda-wrap" style="display:none;">
                 <div class="seccion">Ítems a cobrar</div>
                 <p style="font-size:12px;color:#888;margin-bottom:10px;">
                     Marca los ítems que vas a cobrar. Edita el monto si es un pago parcial.
                 </p>
-                <div id="cobro-items-list"></div>
+                <div id="pago-items-list"></div>
 
                 <!-- Resumen del total seleccionado -->
-                <div id="cobro-total-wrap" style="display:none; background:#f0f9f4; border:1px solid #27ae60; border-radius:8px; padding:10px 14px; margin-top:10px; margin-bottom:4px; display:none; justify-content:space-between; align-items:center;">
+                <div id="pago-total-wrap" style="display:none; background:#f0f9f4; border:1px solid #27ae60; border-radius:8px; padding:10px 14px; margin-top:10px; margin-bottom:4px; display:none; justify-content:space-between; align-items:center;">
                     <span style="font-size:13px;color:#27ae60;font-weight:bold;">Total a cobrar:</span>
-                    <span id="cobro-total-valor" style="font-size:20px;font-weight:bold;color:#27ae60;">S/ 0</span>
+                    <span id="pago-total-valor" style="font-size:20px;font-weight:bold;color:#27ae60;">S/ 0</span>
                 </div>
             </div>
 
             <!-- Inputs ocultos generados dinámicamente al enviar -->
-            <div id="cobro-hidden-inputs"></div>
+            <div id="pago-hidden-inputs"></div>
 
             <div class="seccion">Pago</div>
             <div class="field" style="max-width:200px;">
                 <label>Fecha *</label>
-                <input type="date" name="fecha_cobro" id="fecha-cobro" required>
+                <input type="date" name="fecha_pago" id="fecha-pago" required>
             </div>
             <div class="seccion">Forma de pago</div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Efectivo</label>
-                    <input type="number" name="efectivo_cobro" placeholder="0" step="1" min="0">
+                    <input type="number" name="efectivo_pago" placeholder="0" step="1" min="0">
                 </div>
                 <div class="field">
                     <label>Yape</label>
-                    <input type="number" name="yape_cobro" placeholder="0" step="1" min="0">
+                    <input type="number" name="yape_pago" placeholder="0" step="1" min="0">
                 </div>
             </div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Plin</label>
-                    <input type="number" name="plin_cobro" placeholder="0" step="1" min="0">
+                    <input type="number" name="plin_pago" placeholder="0" step="1" min="0">
                 </div>
                 <div class="field">
                     <label>Giro</label>
-                    <input type="number" name="giro_cobro" placeholder="0" step="1" min="0">
+                    <input type="number" name="giro_pago" placeholder="0" step="1" min="0">
                 </div>
             </div>
             <div class="field">
                 <label>Notas (opcional)</label>
-                <input type="text" name="notas_cobro" placeholder="Observaciones adicionales">
+                <input type="text" name="notas_pago" placeholder="Observaciones adicionales">
             </div>
 
             <!-- Sección de crédito -->
@@ -530,7 +530,7 @@
                 <div id="anticipos-list"></div>
             </div>
 
-            <button type="submit">REGISTRAR COBRO</button>
+            <button type="submit">REGISTRAR PAGO</button>
         </form>
     </div>
 
@@ -597,7 +597,7 @@
             <div class="dash-subtabs">
                 <button class="dash-subtab-btn active" onclick="cambiarSubtabDash('general', this)">General</button>
                 <button class="dash-subtab-btn" onclick="cambiarSubtabDash('clientes', this)">Clientes</button>
-                <button class="dash-subtab-btn" onclick="cambiarSubtabDash('cobros', this)">Cobros</button>
+                <button class="dash-subtab-btn" onclick="cambiarSubtabDash('pagos', this)">Pagos</button>
             </div>
 
             <!-- ─── PANEL: GENERAL ─────────────────────────────────── -->
@@ -735,21 +735,21 @@
             </div><!-- /panel-clientes -->
 
             <!-- ─── PANEL: COBROS ─────────────────────────────────── -->
-            <div id="dash-panel-cobros" class="dash-panel" style="display:none;">
+            <div id="dash-panel-pagos" class="dash-panel" style="display:none;">
 
-                <div class="kpi-seccion">Resumen de cobros</div>
+                <div class="kpi-seccion">Resumen de pagos</div>
                 <div class="kpi-grid kpi-2">
                     <div class="kpi-card kpi-verde">
                         <div class="kpi-label">Total Cobrado</div>
-                        <div class="kpi-valor" id="kpi-cobros-total">—</div>
+                        <div class="kpi-valor" id="kpi-pagos-total">—</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label">N° Cobros</div>
-                        <div class="kpi-valor" id="kpi-cobros-count">—</div>
+                        <div class="kpi-label">N° Pagos</div>
+                        <div class="kpi-valor" id="kpi-pagos-count">—</div>
                     </div>
                 </div>
 
-                <div class="kpi-seccion">Métodos de cobro recibidos</div>
+                <div class="kpi-seccion">Métodos de pago recibidos</div>
                 <div class="kpi-grid kpi-2">
                     <div class="kpi-card">
                         <div class="kpi-label">Efectivo</div>
@@ -770,22 +770,22 @@
                 </div>
 
                 <div class="chart-card">
-                    <div class="chart-titulo">Distribución por método de cobro</div>
+                    <div class="chart-titulo">Distribución por método de pago</div>
                     <canvas id="chart-metodos" height="200"></canvas>
                 </div>
 
                 <div class="chart-card">
-                    <div class="chart-titulo">Cobros recientes</div>
-                    <div id="tabla-cobros-recientes"></div>
+                    <div class="chart-titulo">Pagos recientes</div>
+                    <div id="tabla-pagos-recientes"></div>
                 </div>
 
-                <div class="kpi-seccion">Pendientes de cobro por antigüedad</div>
+                <div class="kpi-seccion">Pendientes de pago por antigüedad</div>
                 <div style="font-size:11px;color:#aaa;margin-bottom:8px;">
                     Servicios vendidos con saldo sin cobrar — calculado al día de hoy
                 </div>
-                <div id="tabla-pendientes-cobro"></div>
+                <div id="tabla-pendientes-pago"></div>
 
-            </div><!-- /panel-cobros -->
+            </div><!-- /panel-pagos -->
 
         </div><!-- /dash-contenido -->
     </div>
@@ -1009,12 +1009,12 @@ function actualizarCodigoCliente() {
         fetch('/cliente?nombre=' + encodeURIComponent(nombre))
             .then(r => r.json())
             .then(d => {
-                const cobrosCredito = d.cobros.filter(c =>
+                const pagosCredito = d.pagos.filter(c =>
                     (c.CATEGORIA || '').startsWith('CRÉDITO') ||
                     (c.CATEGORIA || '').startsWith('ANTICIPO')
                 );
-                creditoDisponible = cobrosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
-                creditoNotas = cobrosCredito.map(c => {
+                creditoDisponible = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                creditoNotas = pagosCredito.map(c => {
                     const nota = (c.CATEGORIA || '').replace(/^CRÉDITO:?\s*/i, '').replace(/^ANTICIPO:?\s*/i, '').trim();
                     return nota || null;
                 }).filter(Boolean);
@@ -1930,31 +1930,31 @@ function actualizarDistribucion() {
 function actualizarMonedaBadges() {} // deprecated, mantenida para compatibilidad
 
 // ── Búsqueda de cliente ───────────────────────────────────────────────────────
-// ── Tab Cobro: multi-selección con monto por ítem ────────────────────────────
-let cobrosDeudaTimer = null;
-let cobroItemsData = []; // guarda los datos de cada ítem cargado
+// ── Tab Pagos: multi-selección con monto por ítem ────────────────────────────
+let pagosDeudaTimer = null;
+let pagoItemsData = []; // guarda los datos de cada ítem cargado
 
 function cargarDeudaCliente() {
-    const nombre = document.getElementById('input-cliente-cobro').value.trim();
-    clearTimeout(cobrosDeudaTimer);
-    const wrap = document.getElementById('cobro-deuda-wrap');
-    if (!nombre) { wrap.style.display = 'none'; cobroItemsData = []; return; }
+    const nombre = document.getElementById('input-cliente-pago').value.trim();
+    clearTimeout(pagosDeudaTimer);
+    const wrap = document.getElementById('pago-deuda-wrap');
+    if (!nombre) { wrap.style.display = 'none'; pagoItemsData = []; return; }
 
-    cobrosDeudaTimer = setTimeout(() => {
+    pagosDeudaTimer = setTimeout(() => {
         fetch('/cliente?nombre=' + encodeURIComponent(nombre))
             .then(r => r.json())
             .then(data => {
                 wrap.style.display = 'block';
-                const list = document.getElementById('cobro-items-list');
+                const list = document.getElementById('pago-items-list');
                 const pendientes = data.ventas.filter(v => parseFloat(v.DEBE || 0) > 0);
-                cobroItemsData = pendientes;
+                pagoItemsData = pendientes;
 
                 if (pendientes.length === 0) {
                     const sinDeuda = data.facturado_total > 0
                         ? '<p style="color:#27ae60;font-size:13px;text-align:center;padding:10px 0;">Cliente al día, sin deuda pendiente.</p>'
                         : '<p style="color:#aaa;font-size:13px;text-align:center;padding:10px 0;">Sin ventas registradas para este cliente.</p>';
                     list.innerHTML = sinDeuda;
-                    document.getElementById('cobro-total-wrap').style.display = 'none';
+                    document.getElementById('pago-total-wrap').style.display = 'none';
                     return;
                 }
 
@@ -1963,10 +1963,10 @@ function cargarDeudaCliente() {
                     const debe     = parseFloat(v.DEBE || 0);
                     const totalVal = v['TOTAL S/ (PEN)'] || v['TOTAL'] || '0';
                     html += `
-                    <div class="cobro-item-card" id="cobro-card-${idx}" style="cursor:default;">
+                    <div class="pago-item-card" id="pago-card-${idx}" style="cursor:default;">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
                             <!-- Checkbox -->
-                            <input type="checkbox" id="chk-item-${idx}" onchange="toggleItemCobro(${idx})"
+                            <input type="checkbox" id="chk-item-${idx}" onchange="toggleItemPago(${idx})"
                                 style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#C0392B;">
                             <!-- Info -->
                             <div style="flex:1;min-width:0;" onclick="document.getElementById('chk-item-${idx}').click();" style="cursor:pointer;">
@@ -1981,7 +1981,7 @@ function cargarDeudaCliente() {
                                     <input type="number" id="monto-item-${idx}" value="${Math.round(debe)}"
                                         min="0" step="1"
                                         style="width:70px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:13px;font-weight:bold;color:#C0392B;text-align:right;display:none;"
-                                        oninput="actualizarTotalCobro()">
+                                        oninput="actualizarTotalPago()">
                                 </div>
                                 <div id="quedan-item-${idx}" style="font-size:11px;margin-top:3px;text-align:right;min-height:14px;"></div>
                             </div>
@@ -1989,15 +1989,15 @@ function cargarDeudaCliente() {
                     </div>`;
                 });
                 list.innerHTML = html;
-                actualizarTotalCobro();
+                actualizarTotalPago();
             })
             .catch(() => {});
     }, 500);
 }
 
-function toggleItemCobro(idx) {
+function toggleItemPago(idx) {
     const chk   = document.getElementById('chk-item-' + idx);
-    const card  = document.getElementById('cobro-card-' + idx);
+    const card  = document.getElementById('pago-card-' + idx);
     const campo = document.getElementById('monto-item-' + idx);
     if (chk.checked) {
         card.classList.add('selected');
@@ -2008,12 +2008,12 @@ function toggleItemCobro(idx) {
         const lbl = document.getElementById('quedan-item-' + idx);
         if (lbl) lbl.textContent = '';
     }
-    actualizarTotalCobro();
+    actualizarTotalPago();
 }
 
-function actualizarTotalCobro() {
+function actualizarTotalPago() {
     let total = 0;
-    cobroItemsData.forEach((v, idx) => {
+    pagoItemsData.forEach((v, idx) => {
         const chk = document.getElementById('chk-item-' + idx);
         if (!chk || !chk.checked) return;
         const campo = document.getElementById('monto-item-' + idx);
@@ -2036,10 +2036,10 @@ function actualizarTotalCobro() {
             }
         }
     });
-    const wrap = document.getElementById('cobro-total-wrap');
+    const wrap = document.getElementById('pago-total-wrap');
     if (total > 0) {
         wrap.style.display = 'flex';
-        document.getElementById('cobro-total-valor').textContent = 'S/ ' + Math.round(total);
+        document.getElementById('pago-total-valor').textContent = 'S/ ' + Math.round(total);
     } else {
         wrap.style.display = 'none';
     }
@@ -2070,12 +2070,12 @@ function agregarAnticipo() {
     document.getElementById('anticipos-list').appendChild(div);
 }
 
-function prepararEnvioCobro() {
+function prepararEnvioPago() {
     // Generar inputs ocultos con los ítems seleccionados
-    const container = document.getElementById('cobro-hidden-inputs');
+    const container = document.getElementById('pago-hidden-inputs');
     container.innerHTML = '';
     let hayItems = false;
-    cobroItemsData.forEach((v, idx) => {
+    pagoItemsData.forEach((v, idx) => {
         const chk = document.getElementById('chk-item-' + idx);
         if (!chk || !chk.checked) return;
         const campo = document.getElementById('monto-item-' + idx);
@@ -2087,9 +2087,9 @@ function prepararEnvioCobro() {
             inp.type = 'hidden'; inp.name = name; inp.value = val;
             container.appendChild(inp);
         };
-        addHidden('cod_item_cobro[]',   v.COD_ITEM   || '');
-        addHidden('monto_item_cobro[]', Math.round(monto));
-        addHidden('categoria_cobro[]',  v.CATEGORIA  || '');
+        addHidden('cod_item_pago[]',   v.COD_ITEM   || '');
+        addHidden('monto_item_pago[]', Math.round(monto));
+        addHidden('categoria_pago[]',  v.CATEGORIA  || '');
     });
     // Agregar anticipos de la sección de servicios futuros
     let hayAnticipos = false;
@@ -2106,31 +2106,31 @@ function prepararEnvioCobro() {
             inp.type = 'hidden'; inp.name = name; inp.value = val;
             container.appendChild(inp);
         };
-        addHidden('cod_item_cobro[]',   '');
-        addHidden('monto_item_cobro[]', Math.round(monto));
-        addHidden('categoria_cobro[]',  desc ? 'CRÉDITO: ' + desc : 'CRÉDITO');
+        addHidden('cod_item_pago[]',   '');
+        addHidden('monto_item_pago[]', Math.round(monto));
+        addHidden('categoria_pago[]',  desc ? 'CRÉDITO: ' + desc : 'CRÉDITO');
     }
 
     // Validar que haya algo que cobrar
     if (!hayItems && !hayAnticipos) {
-        const ef = document.querySelector('[name=efectivo_cobro]').value;
-        const ya = document.querySelector('[name=yape_cobro]').value;
-        const pl = document.querySelector('[name=plin_cobro]').value;
-        const gi = document.querySelector('[name=giro_cobro]').value;
+        const ef = document.querySelector('[name=efectivo_pago]').value;
+        const ya = document.querySelector('[name=yape_pago]').value;
+        const pl = document.querySelector('[name=plin_pago]').value;
+        const gi = document.querySelector('[name=giro_pago]').value;
         const totalPago = parseFloat(ef||0)+parseFloat(ya||0)+parseFloat(pl||0)+parseFloat(gi||0);
         if (totalPago <= 0) {
             alert('Selecciona al menos un ítem, agrega un anticipo, o ingresa un método de pago.');
             return false;
         }
-        // Cobro libre sin referencia
+        // Pago libre sin referencia
         const addHidden = (name, val) => {
             const inp = document.createElement('input');
             inp.type = 'hidden'; inp.name = name; inp.value = val;
             container.appendChild(inp);
         };
-        addHidden('cod_item_cobro[]',   '');
-        addHidden('monto_item_cobro[]', totalPago);
-        addHidden('categoria_cobro[]',  'COBRO GENERAL');
+        addHidden('cod_item_pago[]',   '');
+        addHidden('monto_item_pago[]', totalPago);
+        addHidden('categoria_pago[]',  'PAGO GENERAL');
     }
     return true;
 }
@@ -2170,8 +2170,8 @@ function renderVistaItem(data) {
         const cod        = v.COD_ITEM || '';
         const total      = parseFloat(v['TOTAL S/ (PEN)'] || v['TOTAL'] || 0);
         const debe       = parseFloat(v.DEBE || 0);
-        const cobrosItem = cod ? data.cobros.filter(c => c.COD_ITEM === cod) : [];
-        const totalCobrado = cobrosItem.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+        const pagosItem = cod ? data.pagos.filter(c => c.COD_ITEM === cod) : [];
+        const totalCobrado = pagosItem.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
         const tipo       = v.TIPO || '';
         const zona       = v['ZONA/CANTIDAD/ENVASE'] || '';
         const badgeColor = tipo === 'Producto' ? '#2980B9' : '#8E44AD';
@@ -2202,20 +2202,20 @@ function renderVistaItem(data) {
             <div class="dia-monto" style="flex-shrink:0;margin-left:8px;">S/ ${Math.round(total)}</div>
         </div>`;
 
-        // ── Sección Cobros ────────────────────────────────────────────────
-        html += `<div class="dia-seccion-lbl cobro-lbl">Cobros recibidos</div>`;
-        if (cobrosItem.length > 0) {
-            cobrosItem.forEach(c => {
+        // ── Sección Pagos ────────────────────────────────────────────────
+        html += `<div class="dia-seccion-lbl pago-lbl">Pagos recibidos</div>`;
+        if (pagosItem.length > 0) {
+            pagosItem.forEach(c => {
                 html += `<div class="dia-row">
                     <div class="dia-concepto">
                         ${c.FECHA || '—'}
                         <br><small style="color:#888;">${metodosPago(c)}</small>
                     </div>
-                    <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
+                    <div class="dia-monto pago" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
                 </div>`;
             });
         } else {
-            html += `<div style="font-size:12px;color:#bbb;padding:5px 0;">Sin cobros registrados aún.</div>`;
+            html += `<div style="font-size:12px;color:#bbb;padding:5px 0;">Sin pagos registrados aún.</div>`;
         }
 
         // ── Footer: vendido | cobrado | estado ────────────────────────────
@@ -2229,7 +2229,7 @@ function renderVistaItem(data) {
     });
 
     // ── Créditos / pagos sin ítem asignado ───────────────────────────────
-    const creditos = data.cobros.filter(c => !c.COD_ITEM || c.COD_ITEM === '');
+    const creditos = data.pagos.filter(c => !c.COD_ITEM || c.COD_ITEM === '');
     if (creditos.length > 0) {
         const totalCreditos = creditos.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
         html += `<div class="dia-block" style="border-left:3px solid #f0d060;">
@@ -2238,9 +2238,9 @@ function renderVistaItem(data) {
                     <strong style="font-size:14px;color:#856404;">Créditos a favor</strong>
                     <div style="font-size:11px;color:#aaa;margin-top:2px;">Pagos sin servicio asignado</div>
                 </div>
-                <span class="dia-monto cobro">+S/ ${Math.round(totalCreditos)}</span>
+                <span class="dia-monto pago">+S/ ${Math.round(totalCreditos)}</span>
             </div>`;
-        html += `<div class="dia-seccion-lbl cobro-lbl">Detalle</div>`;
+        html += `<div class="dia-seccion-lbl pago-lbl">Detalle</div>`;
         creditos.forEach(c => {
             const cat   = c.CATEGORIA || '';
             const nota  = cat.replace(/^CRÉDITO:?\s*/i,'').replace(/^ANTICIPO:?\s*/i,'').trim();
@@ -2250,7 +2250,7 @@ function renderVistaItem(data) {
                     ${nota ? `<br><small style="color:#888;">${nota}</small>` : ''}
                     <br><small style="color:#aaa;">${metodosPago(c)}</small>
                 </div>
-                <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
+                <div class="dia-monto pago" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
             </div>`;
         });
         html += `</div>`;
@@ -2260,20 +2260,20 @@ function renderVistaItem(data) {
 }
 
 function renderVistaCrono(data) {
-    if (data.ventas.length === 0 && data.cobros.length === 0)
+    if (data.ventas.length === 0 && data.pagos.length === 0)
         return '<p class="sin-datos">Sin historial registrado.</p>';
 
     const diasSet = new Set();
     data.ventas.forEach(v => { if (v.FECHA) diasSet.add(v.FECHA); });
-    data.cobros.forEach(c => { if (c.FECHA) diasSet.add(c.FECHA); });
+    data.pagos.forEach(c => { if (c.FECHA) diasSet.add(c.FECHA); });
     const dias = Array.from(diasSet).sort((a, b) => parseFechaStr(b) - parseFechaStr(a));
 
     let html = '';
     dias.forEach(dia => {
         const ventasDia = data.ventas.filter(v => v.FECHA === dia);
-        const cobrosDia = data.cobros.filter(c => c.FECHA === dia);
+        const pagosDia = data.pagos.filter(c => c.FECHA === dia);
         const totalVendido = ventasDia.reduce((s, v) => s + parseFloat(v['TOTAL S/ (PEN)'] || v['TOTAL'] || 0), 0);
-        const totalCobrado = cobrosDia.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+        const totalCobrado = pagosDia.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
 
         html += `<div class="dia-block"><div class="dia-header">${dia}</div>`;
 
@@ -2292,16 +2292,16 @@ function renderVistaCrono(data) {
             });
         }
 
-        if (cobrosDia.length > 0) {
-            html += `<div class="dia-seccion-lbl cobro-lbl">Cobros recibidos</div>`;
-            cobrosDia.forEach(c => {
+        if (pagosDia.length > 0) {
+            html += `<div class="dia-seccion-lbl pago-lbl">Pagos recibidos</div>`;
+            pagosDia.forEach(c => {
                 const codItem = c.COD_ITEM ? `<span class="dia-cod">${c.COD_ITEM}</span>` : '';
                 html += `<div class="dia-row">
                     <div class="dia-concepto">
                         ${c.CATEGORIA || '—'}${codItem}
                         <br><small style="color:#888;">${metodosPago(c)}</small>
                     </div>
-                    <div class="dia-monto cobro" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
+                    <div class="dia-monto pago" style="flex-shrink:0;margin-left:8px;">+S/ ${c.MONTO || '0'}</div>
                 </div>`;
             });
         }
@@ -2309,11 +2309,11 @@ function renderVistaCrono(data) {
         html += `<div class="dia-footer">`;
         if (ventasDia.length > 0)
             html += `<span style="color:#888;">Vendido: <strong>S/ ${Math.round(totalVendido)}</strong></span>`;
-        if (cobrosDia.length > 0)
+        if (pagosDia.length > 0)
             html += `<span style="color:#27ae60;">Cobrado: <strong>S/ ${Math.round(totalCobrado)}</strong></span>`;
-        if (ventasDia.length === 0 && cobrosDia.length > 0)
-            html += `<span style="color:#27ae60;font-style:italic;">Solo cobro</span>`;
-        if (ventasDia.length > 0 && cobrosDia.length === 0)
+        if (ventasDia.length === 0 && pagosDia.length > 0)
+            html += `<span style="color:#27ae60;font-style:italic;">Solo pago</span>`;
+        if (ventasDia.length > 0 && pagosDia.length === 0)
             html += `<span style="color:#C0392B;font-style:italic;">Sin pago registrado este día</span>`;
         html += `</div></div>`;
     });
@@ -2603,30 +2603,30 @@ function cargarDashboard() {
         }
         renderAging(d.deudores_aging, 'tabla-deudores-aging');
 
-        // ── COBROS: KPIs ──
-        const cobrosTotal = d.cobros_ef_efectivo + d.cobros_ef_yape + d.cobros_ef_plin + d.cobros_ef_giro;
-        document.getElementById('kpi-cobros-total').textContent  = fmt(cobrosTotal);
-        document.getElementById('kpi-cobros-count').textContent  = d.cobros_recientes.length + (d.cobros_recientes.length === 10 ? '+' : '');
-        document.getElementById('kpi-cob-ef').textContent = fmt(d.cobros_ef_efectivo);
-        document.getElementById('kpi-cob-yp').textContent = fmt(d.cobros_ef_yape);
-        document.getElementById('kpi-cob-pl').textContent = fmt(d.cobros_ef_plin);
-        document.getElementById('kpi-cob-gi').textContent = fmt(d.cobros_ef_giro);
+        // ── PAGOS: KPIs ──
+        const pagosTotal = d.pagos_ef_efectivo + d.pagos_ef_yape + d.pagos_ef_plin + d.pagos_ef_giro;
+        document.getElementById('kpi-pagos-total').textContent  = fmt(pagosTotal);
+        document.getElementById('kpi-pagos-count').textContent  = d.pagos_recientes.length + (d.pagos_recientes.length === 10 ? '+' : '');
+        document.getElementById('kpi-cob-ef').textContent = fmt(d.pagos_ef_efectivo);
+        document.getElementById('kpi-cob-yp').textContent = fmt(d.pagos_ef_yape);
+        document.getElementById('kpi-cob-pl').textContent = fmt(d.pagos_ef_plin);
+        document.getElementById('kpi-cob-gi').textContent = fmt(d.pagos_ef_giro);
 
-        // ── COBROS: métodos donut ──
+        // ── PAGOS: métodos donut ──
         destroyChart('metodos');
-        const metV=[d.cobros_ef_efectivo,d.cobros_ef_yape,d.cobros_ef_plin,d.cobros_ef_giro], metL=['Efectivo','Yape','Plin','Giro'];
+        const metV=[d.pagos_ef_efectivo,d.pagos_ef_yape,d.pagos_ef_plin,d.pagos_ef_giro], metL=['Efectivo','Yape','Plin','Giro'];
         charts['metodos'] = new Chart(document.getElementById('chart-metodos'), {
             type: 'doughnut',
             data: { labels: metL.filter((_,i)=>metV[i]>0), datasets:[{ data:metV.filter(v=>v>0), backgroundColor:COLORES, hoverOffset:6 }]},
             options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
         });
 
-        // ── COBROS: tabla cobros recientes ──
+        // ── PAGOS: tabla cobros recientes ──
         let htmlCR='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Monto</th><th>Método</th></tr></thead><tbody>';
-        if (d.cobros_recientes.length === 0) {
-            htmlCR += '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px;">Sin cobros en este período</td></tr>';
+        if (d.pagos_recientes.length === 0) {
+            htmlCR += '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px;">Sin pagos en este período</td></tr>';
         } else {
-            d.cobros_recientes.forEach(c => {
+            d.pagos_recientes.forEach(c => {
                 htmlCR+=`<tr>
                     <td>${c.fecha}</td>
                     <td>${c.cliente}</td>
@@ -2636,9 +2636,9 @@ function cargarDashboard() {
                 </tr>`;
             });
         }
-        document.getElementById('tabla-cobros-recientes').innerHTML = htmlCR + '</tbody></table>';
+        document.getElementById('tabla-pagos-recientes').innerHTML = htmlCR + '</tbody></table>';
 
-        // ── COBROS: pendientes por antigüedad ──
+        // ── PAGOS: pendientes por antigüedad ──
         renderAging(d.pendientes_cobro, 'tabla-pendientes-cobro');
 
         document.getElementById('dash-contenido').style.display = 'block';
@@ -2675,7 +2675,7 @@ document.querySelectorAll('form').forEach(form => {
 });
 
 // Fechas de hoy por defecto
-['fecha-venta', 'fecha-gasto', 'fecha-cobro'].forEach(id => {
+['fecha-venta', 'fecha-gasto', 'fecha-pago'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.valueAsDate = new Date();
 });
