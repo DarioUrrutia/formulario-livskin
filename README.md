@@ -19,11 +19,13 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
   - **Gratis**: el campo de precio sigue visible como referencia, pero TOTAL = 0; no entra en facturado ni por cobrar; la distribución de pago ignora ese ítem; cualquier pago recibido queda como saldo a favor o cubre deudas anteriores
   - **Descuento**: precio cobrado = lista − descuento; se registra el monto cedido en `DESCUENTO S/`; el descuento no puede ser mayor o igual al precio de venta
   - Validación doble (frontend + backend) para garantizar integridad
+- **Campos obligatorios con validación progresiva**: la sección de pago solo aparece cuando Cliente, Tipo, Categoría y Precio están completos; un aviso amarillo en tiempo real indica exactamente qué falta por llenar
 - **Precio de venta obligatorio**: no se puede guardar una venta si algún ítem no tiene precio ingresado; el botón GUARDAR VENTA se bloquea y el campo se marca en rojo
 - **Precio de venta estático**: el campo de precio solo lo edita el usuario; el sistema nunca lo modifica automáticamente; todos los cálculos (descuento, gratis, distribución) se derivan de ese valor
 - **Aviso al cambiar precio con promo activa**: si el usuario modifica el precio de un ítem que ya tenía Gratis o Descuento aplicado, aparece un aviso inline con tres opciones: mantener la promo con el nuevo precio, cambiar el valor del descuento (el cursor va directo al campo preseleccionado), o quitar la promo
 - **Aviso venta a deuda**: si no se ingresa ningún monto de pago, aparece un aviso indicando que la venta quedará completamente como deuda pendiente de cobro
 - **Tipos, categorías y áreas dinámicos**: configurables desde la hoja "Listas" de Google Sheets sin tocar código; la hoja se crea automáticamente con valores por defecto al primer uso
+- **Sincronización de datos del cliente**: al modificar teléfono, email o fecha de nacimiento durante una venta, los datos se sincronizan automáticamente con la hoja Clientes; campos vacíos se llenan sin preguntar, sobreescrituras y borrados requieren confirmación inline con opción Actualizar/Restaurar
 - Códigos únicos automáticos: `LIVCLIENT####`, `LIVTRAT####`, `LIVPROD####`
 - Protección contra doble registro (botón se deshabilita al enviar)
 
@@ -115,7 +117,11 @@ formulario-livskin/
 │   ├── migrar_datos.py          # Migración legacy (asignación de COD_CLIENTE/COD_ITEM)
 │   ├── sync_claude_plans.py     # Sincroniza planes de Claude Code al folder
 │   ├── backup_claude_state.py   # Backup de sesiones/memoria/planes para portabilidad
-│   └── restore_claude_state.py  # Restaurar estado de Claude en otra PC
+│   ├── restore_claude_state.py  # Restaurar estado de Claude en otra PC
+│   ├── google_apps_script_backup.js  # Script para Google Apps Script: backup diario automático de la Sheet
+│   ├── backup_db.py             # Backup local de la Sheet a Google Drive (alternativa)
+│   ├── instalar_backup_diario.bat   # Instalador de tarea programada Windows para backup local
+│   └── verify_ids.py            # Verificador de consistencia entre IDs de JS y HTML
 └── docs/
     ├── plans/
     │   └── PLAN_MANTENIMIENTO_3_ANOS.md   # Plan a 2 años con migración Año 1 → Año 2
@@ -260,6 +266,19 @@ Incluye:
 - Estimación de costos
 
 **Léelo antes de hacer cambios estructurales o migraciones grandes.**
+
+## Backup automático de la base de datos
+
+La Google Sheet se respalda automáticamente cada día a las **2:00 AM hora Perú** usando **Google Apps Script** (corre en la nube de Google, no requiere PC encendida).
+
+- **Destino:** `G:\Il mio Drive\Livskin\Database - Formulario Livskin\Db - Produccion\Backups\` (carpeta compartida en Google Drive)
+- **Retención:** últimos 30 backups (se borran los más antiguos automáticamente)
+- **Script:** [`tools/google_apps_script_backup.js`](tools/google_apps_script_backup.js) — instalado en la Sheet via Extensiones > Apps Script
+- **Trigger:** configurado como temporizador diario en Apps Script (9:00-10:00 GMT+2 = 2:00 AM Perú)
+
+Para verificar que funciona: abrir la carpeta de Backups en Google Drive y confirmar que hay un archivo `Backup Livskin YYYY-MM-DD` reciente.
+
+---
 
 ## Notas técnicas
 
