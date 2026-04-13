@@ -466,6 +466,17 @@
                 </datalist>
             </div>
 
+            <!-- Crédito existente del cliente -->
+            <div id="pago-credito-disponible" style="display:none; background:#fffdf0; border:1px solid #ffd966; border-radius:8px; padding:10px 14px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-size:13px; font-weight:bold; color:#856404;">Crédito a favor del cliente</span>
+                        <div id="pago-credito-disponible-nota" style="font-size:11px; color:#aaa; margin-top:2px;"></div>
+                    </div>
+                    <span id="pago-credito-disponible-monto" style="font-size:20px; font-weight:bold; color:#856404;">S/ 0</span>
+                </div>
+            </div>
+
             <!-- Ítems pendientes con multi-selección -->
             <div id="pago-deuda-wrap" style="display:none;">
                 <div class="seccion">Ítems a cobrar</div>
@@ -1959,12 +1970,37 @@ function cargarDeudaCliente() {
     const nombre = document.getElementById('input-cliente-pago').value.trim();
     clearTimeout(pagosDeudaTimer);
     const wrap = document.getElementById('pago-deuda-wrap');
-    if (!nombre) { wrap.style.display = 'none'; pagoItemsData = []; return; }
+    const creditoWrap = document.getElementById('pago-credito-disponible');
+    if (!nombre) {
+        wrap.style.display = 'none';
+        creditoWrap.style.display = 'none';
+        pagoItemsData = [];
+        return;
+    }
 
     pagosDeudaTimer = setTimeout(() => {
         fetch('/cliente?nombre=' + encodeURIComponent(nombre))
             .then(r => r.json())
             .then(data => {
+                // ── Crédito disponible previo ──────────────────────────────────
+                const pagosCredito = (data.pagos || []).filter(c =>
+                    (c.CATEGORIA || '').startsWith('CRÉDITO') ||
+                    (c.CATEGORIA || '').startsWith('ANTICIPO')
+                );
+                const creditoExistente = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                if (creditoExistente > 0.5) {
+                    creditoWrap.style.display = 'block';
+                    document.getElementById('pago-credito-disponible-monto').textContent = 'S/ ' + Math.round(creditoExistente);
+                    const notas = pagosCredito
+                        .map(c => (c.CATEGORIA || '').replace(/^CRÉDITO:?\s*/i, '').replace(/^ANTICIPO:?\s*/i, '').trim())
+                        .filter(Boolean);
+                    document.getElementById('pago-credito-disponible-nota').textContent =
+                        notas.length > 0 ? notas.join(', ') : 'Crédito sin asignación específica';
+                } else {
+                    creditoWrap.style.display = 'none';
+                }
+
+                // ── Ítems con deuda pendiente ──────────────────────────────────
                 wrap.style.display = 'block';
                 const list = document.getElementById('pago-items-list');
                 const pendientes = data.ventas.filter(v => parseFloat(v.DEBE || 0) > 0);
