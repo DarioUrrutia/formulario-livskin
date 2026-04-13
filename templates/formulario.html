@@ -493,26 +493,47 @@
             <div class="fila-dos">
                 <div class="field">
                     <label>Efectivo</label>
-                    <input type="number" name="efectivo_pago" placeholder="0" step="1" min="0">
+                    <input type="number" name="efectivo_pago" id="pago-ef-efectivo" placeholder="0" step="1" min="0" oninput="autoRellenarPagoTab()">
                 </div>
                 <div class="field">
                     <label>Yape</label>
-                    <input type="number" name="yape_pago" placeholder="0" step="1" min="0">
+                    <input type="number" name="yape_pago" id="pago-ef-yape" placeholder="0" step="1" min="0" oninput="autoRellenarPagoTab()">
                 </div>
             </div>
             <div class="fila-dos">
                 <div class="field">
                     <label>Plin</label>
-                    <input type="number" name="plin_pago" placeholder="0" step="1" min="0">
+                    <input type="number" name="plin_pago" id="pago-ef-plin" placeholder="0" step="1" min="0" oninput="autoRellenarPagoTab()">
                 </div>
                 <div class="field">
                     <label>Giro</label>
-                    <input type="number" name="giro_pago" placeholder="0" step="1" min="0">
+                    <input type="number" name="giro_pago" id="pago-ef-giro" placeholder="0" step="1" min="0" oninput="autoRellenarPagoTab()">
                 </div>
             </div>
             <div class="field">
                 <label>Notas (opcional)</label>
                 <input type="text" name="notas_pago" placeholder="Observaciones adicionales">
+            </div>
+
+            <!-- Resumen de pago: ingresado vs. asignado -->
+            <div id="pago-resumen-wrap" style="display:none; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:10px 14px; margin-top:12px; font-size:13px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="color:#666;">Total ingresado:</span>
+                    <span id="pago-resumen-ingresado" style="font-weight:bold;">S/ 0</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="color:#666;">Asignado a ítems:</span>
+                    <span id="pago-resumen-asignado" style="font-weight:bold;">S/ 0</span>
+                </div>
+                <div id="pago-credito-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #ffeaa7; background:#fffdf0; border-radius:5px; padding:6px 8px;">
+                    <span style="color:#e67e22; font-weight:bold;">Crédito a favor:</span>
+                    <span id="pago-credito-monto" style="color:#e67e22; font-weight:bold;">S/ 0</span>
+                </div>
+                <div style="font-size:11px; color:#aaa; margin-top:4px; display:none;" id="pago-credito-nota">Se registrará automáticamente como crédito del cliente.</div>
+                <div id="pago-falta-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #f5c6cb; background:#fff5f5; border-radius:5px; padding:6px 8px;">
+                    <span style="color:#c0392b; font-weight:bold;">Falta por pagar:</span>
+                    <span id="pago-falta-monto" style="color:#c0392b; font-weight:bold;">S/ 0</span>
+                </div>
             </div>
 
             <!-- Sección de crédito -->
@@ -2011,6 +2032,31 @@ function toggleItemPago(idx) {
     actualizarTotalPago();
 }
 
+function autoRellenarPagoTab() {
+    const ef = parseFloat(document.getElementById('pago-ef-efectivo')?.value || 0);
+    const ya = parseFloat(document.getElementById('pago-ef-yape')?.value || 0);
+    const pl = parseFloat(document.getElementById('pago-ef-plin')?.value || 0);
+    const gi = parseFloat(document.getElementById('pago-ef-giro')?.value || 0);
+    let disponible = ef + ya + pl + gi;
+
+    if (disponible <= 0) {
+        actualizarTotalPago();
+        return;
+    }
+
+    pagoItemsData.forEach((v, idx) => {
+        const chk = document.getElementById('chk-item-' + idx);
+        if (!chk || !chk.checked) return;
+        const debe = parseFloat(v.DEBE || 0);
+        const asignar = Math.min(debe, Math.max(0, disponible));
+        const campo = document.getElementById('monto-item-' + idx);
+        if (campo) campo.value = Math.round(asignar);
+        disponible -= asignar;
+    });
+
+    actualizarTotalPago();
+}
+
 function actualizarTotalPago() {
     let total = 0;
     pagoItemsData.forEach((v, idx) => {
@@ -2043,6 +2089,42 @@ function actualizarTotalPago() {
     } else {
         wrap.style.display = 'none';
     }
+
+    // Resumen ingresado vs asignado
+    const ef = parseFloat(document.getElementById('pago-ef-efectivo')?.value || 0);
+    const ya = parseFloat(document.getElementById('pago-ef-yape')?.value || 0);
+    const pl = parseFloat(document.getElementById('pago-ef-plin')?.value || 0);
+    const gi = parseFloat(document.getElementById('pago-ef-giro')?.value || 0);
+    const totalIngresado = ef + ya + pl + gi;
+    const exceso = Math.round(totalIngresado - total);
+
+    const resumenWrap  = document.getElementById('pago-resumen-wrap');
+    const creditoRow   = document.getElementById('pago-credito-row');
+    const creditoNota  = document.getElementById('pago-credito-nota');
+    const faltaRow     = document.getElementById('pago-falta-row');
+
+    if (totalIngresado > 0 || total > 0) {
+        resumenWrap.style.display = 'block';
+        document.getElementById('pago-resumen-ingresado').textContent = 'S/ ' + Math.round(totalIngresado);
+        document.getElementById('pago-resumen-asignado').textContent  = 'S/ ' + Math.round(total);
+        if (exceso > 0) {
+            creditoRow.style.display  = 'flex';
+            creditoNota.style.display = 'block';
+            document.getElementById('pago-credito-monto').textContent = 'S/ ' + exceso;
+            faltaRow.style.display    = 'none';
+        } else if (exceso < -1) {
+            faltaRow.style.display    = 'flex';
+            document.getElementById('pago-falta-monto').textContent   = 'S/ ' + Math.abs(exceso);
+            creditoRow.style.display  = 'none';
+            creditoNota.style.display = 'none';
+        } else {
+            creditoRow.style.display  = 'none';
+            creditoNota.style.display = 'none';
+            faltaRow.style.display    = 'none';
+        }
+    } else {
+        resumenWrap.style.display = 'none';
+    }
 }
 
 let anticipoCount = 0;
@@ -2074,6 +2156,13 @@ function prepararEnvioPago() {
     // Generar inputs ocultos con los ítems seleccionados
     const container = document.getElementById('pago-hidden-inputs');
     container.innerHTML = '';
+
+    const addHidden = (name, val) => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = name; inp.value = val;
+        container.appendChild(inp);
+    };
+
     let hayItems = false;
     pagoItemsData.forEach((v, idx) => {
         const chk = document.getElementById('chk-item-' + idx);
@@ -2082,16 +2171,12 @@ function prepararEnvioPago() {
         const monto = parseFloat(campo ? campo.value || 0 : 0);
         if (monto <= 0) return;
         hayItems = true;
-        const addHidden = (name, val) => {
-            const inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = name; inp.value = val;
-            container.appendChild(inp);
-        };
         addHidden('cod_item_pago[]',   v.COD_ITEM   || '');
         addHidden('monto_item_pago[]', Math.round(monto));
         addHidden('categoria_pago[]',  v.CATEGORIA  || '');
     });
-    // Agregar anticipos de la sección de servicios futuros
+
+    // Agregar anticipos manuales de la sección "Agregar crédito"
     let hayAnticipos = false;
     for (let i = 1; i <= anticipoCount; i++) {
         const descEl  = document.getElementById('anticipo-desc-' + i);
@@ -2101,35 +2186,37 @@ function prepararEnvioPago() {
         if (monto <= 0) continue;
         const desc = descEl.value.trim() || 'Servicio futuro';
         hayAnticipos = true;
-        const addHidden = (name, val) => {
-            const inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = name; inp.value = val;
-            container.appendChild(inp);
-        };
         addHidden('cod_item_pago[]',   '');
         addHidden('monto_item_pago[]', Math.round(monto));
         addHidden('categoria_pago[]',  desc ? 'CRÉDITO: ' + desc : 'CRÉDITO');
     }
 
+    // Auto-crédito: si el total ingresado supera lo asignado a ítems + anticipos
+    const ef = parseFloat(document.getElementById('pago-ef-efectivo')?.value || 0);
+    const ya = parseFloat(document.getElementById('pago-ef-yape')?.value || 0);
+    const pl = parseFloat(document.getElementById('pago-ef-plin')?.value || 0);
+    const gi = parseFloat(document.getElementById('pago-ef-giro')?.value || 0);
+    const totalIngresado = ef + ya + pl + gi;
+    const existingMontos = container.querySelectorAll('[name="monto_item_pago[]"]');
+    let totalYaAsignado = 0;
+    existingMontos.forEach(el => { totalYaAsignado += parseFloat(el.value || 0); });
+    const exceso = Math.round(totalIngresado - totalYaAsignado);
+    if (exceso > 0) {
+        hayItems = true;
+        addHidden('cod_item_pago[]',   '');
+        addHidden('monto_item_pago[]', exceso);
+        addHidden('categoria_pago[]',  'CRÉDITO');
+    }
+
     // Validar que haya algo que cobrar
     if (!hayItems && !hayAnticipos) {
-        const ef = document.querySelector('[name=efectivo_pago]').value;
-        const ya = document.querySelector('[name=yape_pago]').value;
-        const pl = document.querySelector('[name=plin_pago]').value;
-        const gi = document.querySelector('[name=giro_pago]').value;
-        const totalPago = parseFloat(ef||0)+parseFloat(ya||0)+parseFloat(pl||0)+parseFloat(gi||0);
-        if (totalPago <= 0) {
+        if (totalIngresado <= 0) {
             alert('Selecciona al menos un ítem, agrega un anticipo, o ingresa un método de pago.');
             return false;
         }
-        // Pago libre sin referencia
-        const addHidden = (name, val) => {
-            const inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = name; inp.value = val;
-            container.appendChild(inp);
-        };
+        // Pago libre sin referencia a ítems
         addHidden('cod_item_pago[]',   '');
-        addHidden('monto_item_pago[]', totalPago);
+        addHidden('monto_item_pago[]', Math.round(totalIngresado));
         addHidden('categoria_pago[]',  'PAGO GENERAL');
     }
     return true;
