@@ -8,7 +8,7 @@ import json
 import time
 
 app = Flask(__name__)
-app.secret_key = "livskin2024"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "livskin2024-dev-only")
 
 SHEET_ID = "1o4Vh4RN_Qfpaz8g08MReqgE3mFX0EGVSI5A69OsHB5g"
 
@@ -162,13 +162,43 @@ def get_sheets():
     return (_worksheets_cache["ventas"], _worksheets_cache["gastos"],
             _worksheets_cache["pagos"], _worksheets_cache["clientes"])
 
-def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos="", email=""):
-    """Retorna el código del cliente, creándolo si no existe."""
+def get_or_create_cliente(clientes_ws, nombre, telefono="", cumpleanos="", email="", actualizar=False):
+    """Retorna el código del cliente, creándolo si no existe.
+    Si existe y hay datos nuevos:
+      - Campos vacíos en Clientes se llenan automáticamente (sin preguntar).
+      - Campos con valor distinto solo se sobreescriben si actualizar=True.
+    """
     todos = clientes_ws.get_all_values()
     nombre_lower = nombre.strip().lower()
-    for fila in todos[1:]:
+    for row_idx, fila in enumerate(todos[1:], start=2):  # start=2 porque fila 1 es header
         if len(fila) > 1 and fila[1].strip().lower() == nombre_lower:
-            return fila[0]
+            codigo = fila[0]
+            # Intentar actualizar datos del cliente
+            tel_actual  = fila[2].strip() if len(fila) > 2 else ""
+            cum_actual  = fila[3].strip() if len(fila) > 3 else ""
+            email_actual = fila[5].strip() if len(fila) > 5 else ""
+
+            updates = {}  # {col_letter: new_value}
+            # Teléfono
+            if telefono.strip() and not tel_actual:
+                updates["C"] = telefono.strip()          # llenar vacío (sin preguntar)
+            elif actualizar and telefono.strip() != tel_actual:
+                updates["C"] = telefono.strip()          # sobreescribir o borrar (confirmado)
+            # Cumpleaños
+            if cumpleanos.strip() and not cum_actual:
+                updates["D"] = cumpleanos.strip()
+            elif actualizar and cumpleanos.strip() != cum_actual:
+                updates["D"] = cumpleanos.strip()
+            # Email
+            if email.strip() and not email_actual:
+                updates["F"] = email.strip()
+            elif actualizar and email.strip() != email_actual:
+                updates["F"] = email.strip()
+
+            for col, val in updates.items():
+                clientes_ws.update_acell(f"{col}{row_idx}", val)
+
+            return codigo
     # Crear nuevo cliente
     num = len([r for r in todos[1:] if any(r)]) + 1
     codigo = f"LIVCLIENT{num:04d}"
@@ -313,8 +343,9 @@ def guardar_venta():
         cumpleanos = request.form.get("cumpleanos", "")
         moneda     = request.form.get("moneda", "SOLES")
 
-        # Obtener o crear código de cliente
-        cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos, email)
+        # Obtener o crear código de cliente (actualizar datos si el usuario confirmó)
+        actualizar_cli = request.form.get("actualizar_cliente", "0") == "1"
+        cod_cliente = get_or_create_cliente(clientes_ws, cliente, telefono, cumpleanos, email, actualizar=actualizar_cli)
 
         # Métodos de pago del día (van solo en la primera fila)
         efectivo = request.form.get("efectivo", "")
@@ -415,7 +446,7 @@ def guardar_venta():
                 round(item["descuento"]) if item["descuento"] else "",
             ])
 
-        # ── Fase 3: registrar en Cobros (uno por ítem pagado, relacional) ─────
+        # ── Fase 3: registrar en Pagos (uno por ítem pagado, relacional) ─────
         credito_aplicado = to_float(request.form.get("credito_aplicado", "0"))
         _, _, pagos, _ = get_sheets()
 
@@ -648,7 +679,7 @@ def ver_cliente():
                 except (ValueError, IndexError):
                     pass
 
-    # Cobros del cliente — usa caché
+    # Pagos del cliente — usa caché
     todos_pagos = _get_cached_values(pagos_ws, "pagos")
     pagos_cliente = []
     cobrado_total = 0.0
@@ -672,7 +703,7 @@ def ver_cliente():
                 except (ValueError, IndexError):
                     pass
 
-    # Calcular DEBE real por ítem: TOTAL - suma de cobros vinculados por COD_ITEM
+    # Calcular DEBE real por ítem: TOTAL - suma de pagos vinculados por COD_ITEM
     pagos_por_item = calcular_pagos_por_item(todos_pagos)
     for v in ventas_cliente:
         cod  = v.get("COD_ITEM", "").strip()
@@ -721,7 +752,7 @@ def parse_num(val):
         return 0.0
 
 def calcular_pagos_por_item(todos_pagos):
-    """Retorna dict {cod_item: total_cobrado} sumando todos los cobros por COD_ITEM."""
+    """Retorna dict {cod_item: total_cobrado} sumando todos los pagos por COD_ITEM."""
     resultado = defaultdict(float)
     if len(todos_pagos) < 2:
         return resultado
@@ -755,7 +786,7 @@ def api_dashboard():
     if len(todos) < 2:
         return jsonify({"sin_datos": True})
 
-    # Precalcular cobros por COD_ITEM (todos, sin filtro de fecha)
+    # Precalcular pagos por COD_ITEM (todos, sin filtro de fecha)
     pagos_por_item = calcular_pagos_por_item(todos_pagos)
 
     # ── Leer ventas ───────────────────────────────────────────────────────────
@@ -773,7 +804,7 @@ def api_dashboard():
             continue
         total_v   = parse_num(g(12))
         cod_item  = g(6)
-        # cobrado real = suma de todos los cobros vinculados a este ítem (sin filtro de fecha)
+        # cobrado real = suma de todos los pagos vinculados a este ítem (sin filtro de fecha)
         cobrado_item = pagos_por_item.get(cod_item, 0.0) if cod_item else 0.0
         cobrado_item = min(cobrado_item, total_v)  # no puede superar el total
         debe_real    = max(0.0, total_v - cobrado_item)
@@ -805,7 +836,7 @@ def api_dashboard():
             continue
         total_gastos += parse_num(gg(5))
 
-    # ── Leer cobros del mismo período ─────────────────────────────────────────
+    # ── Leer pagos del mismo período ─────────────────────────────────────────
     pagos_list = []
     for row in todos_pagos[1:]:
         if not any(row):
@@ -852,11 +883,11 @@ def api_dashboard():
     num_promociones = sum(1 for f in filas if f.get("descuento", 0) > 0)
     ticket_promedio = ventas_total / num_atenciones if num_atenciones else 0
     tasa_cobro      = (cobrado_total / ventas_total * 100) if ventas_total else 0
-    # balance neto usa cobros reales recibidos en el período (no cobrado por venta)
+    # balance neto usa pagos reales recibidos en el período (no cobrado por venta)
     pagos_periodo_total = sum(c["monto"] for c in pagos_list)
     balance_neto    = pagos_periodo_total - total_gastos
 
-    # ── Métodos de pago (de la hoja Cobros, período filtrado) ─────────────────
+    # ── Métodos de pago (de la hoja Pagos, período filtrado) ─────────────────
     ef_efectivo = sum(c["efectivo"] for c in pagos_list)
     ef_yape     = sum(c["yape"]     for c in pagos_list)
     ef_plin     = sum(c["plin"]     for c in pagos_list)
@@ -1057,10 +1088,10 @@ def api_dashboard():
     for bk in deudores_aging:
         deudores_aging[bk]["total"] = round(deudores_aging[bk]["total"], 2)
 
-    # ── Pendientes de cobro para tab Cobros (mismo aging) ────────────────────
-    pendientes_cobro = deudores_aging  # mismo cálculo, mismo origen
+    # ── Pendientes de pago para tab Pagos (mismo aging) ────────────────────
+    pendientes_pago = deudores_aging  # mismo cálculo, mismo origen
 
-    # ── Cobros: recientes ─────────────────────────────────────────────────────
+    # ── Pagos: recientes ─────────────────────────────────────────────────────
     # ef_* ya calculados arriba desde pagos_list, reutilizamos
     pagos_ef_efectivo = ef_efectivo
     pagos_ef_yape     = ef_yape
@@ -1108,7 +1139,7 @@ def api_dashboard():
         "top_clientes":  top_clientes,
         "por_categoria": por_categoria,
         "recientes":     recientes_out,
-        # Cobros
+        # Pagos
         "pagos_ef_efectivo": round(pagos_ef_efectivo, 2),
         "pagos_ef_yape":     round(pagos_ef_yape, 2),
         "pagos_ef_plin":     round(pagos_ef_plin, 2),
@@ -1130,7 +1161,7 @@ def api_dashboard():
         "top20_clientes":     top20_out,
         # Aging
         "deudores_aging":     deudores_aging,
-        "pendientes_cobro":   pendientes_cobro,
+        "pendientes_pago":    pendientes_pago,
     })
 
 @app.route("/api/config")

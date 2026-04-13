@@ -70,6 +70,7 @@
         }
         .seccion:first-child { margin-top: 0; }
         .field { margin-bottom: 14px; }
+        .aviso-cli-campo { margin-top:4px; padding:6px 10px; border-radius:6px; font-size:11px; background:#fff8e1; border:1px solid #ffe082; color:#e65100; }
         label {
             display: block;
             font-weight: bold;
@@ -248,7 +249,7 @@
 
     <!-- ═══════════════════════════════════════════════════════ TAB: VENTA -->
     <div id="tab-venta" class="tab-content form-body">
-        <form method="POST" action="/venta" onsubmit="return validarPreciosFormulario()">
+        <form method="POST" action="/venta" id="form-venta" onsubmit="return validarPreciosFormulario(true)">
 
             <div class="seccion">Cliente</div>
             <div class="field">
@@ -260,7 +261,7 @@
                 <div style="position:relative;">
                     <input type="text" name="cliente" id="input-cliente-venta"
                            placeholder="Nombre del paciente" required
-                           list="lista-clientes" oninput="actualizarCodigoCliente()">
+                           list="lista-clientes" oninput="actualizarCodigoCliente(); actualizarResumen();">
                     <datalist id="lista-clientes">
                         {% for c in clientes %}<option value="{{ c }}">{% endfor %}
                     </datalist>
@@ -278,17 +279,21 @@
             <div class="fila-dos">
                 <div class="field">
                     <label>Teléfono</label>
-                    <input type="tel" name="telefono" id="input-telefono-venta" placeholder="Número">
+                    <input type="tel" name="telefono" id="input-telefono-venta" placeholder="Número" oninput="verificarCampoCli('telefono')">
+                    <div id="aviso-cli-telefono" class="aviso-cli-campo" style="display:none;"></div>
                 </div>
                 <div class="field">
                     <label>Email</label>
-                    <input type="email" name="email" id="input-email-venta" placeholder="correo@ejemplo.com">
+                    <input type="email" name="email" id="input-email-venta" placeholder="correo@ejemplo.com" oninput="verificarCampoCli('email')">
+                    <div id="aviso-cli-email" class="aviso-cli-campo" style="display:none;"></div>
                 </div>
             </div>
             <div class="field">
                 <label>Fecha de Nacimiento</label>
-                <input type="date" name="cumpleanos" id="input-cumpleanos-venta">
+                <input type="date" name="cumpleanos" id="input-cumpleanos-venta" onchange="verificarCampoCli('cumpleanos')">
+                <div id="aviso-cli-cumpleanos" class="aviso-cli-campo" style="display:none;"></div>
             </div>
+            <input type="hidden" name="actualizar_cliente" id="actualizar-cliente-flag" value="0">
 
             <div class="seccion">Servicios / Productos</div>
 
@@ -304,6 +309,10 @@
                 font-size:14px; font-weight:bold; cursor:pointer;">
                 + Agregar servicio / producto
             </button>
+
+            <!-- ── Aviso de campos faltantes ── -->
+            <div id="aviso-faltan-campos" style="display:none; margin-bottom:14px; padding:12px 16px; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; font-size:13px; color:#e65100;">
+            </div>
 
             <!-- ── Resumen + Pago (aparece dinámicamente) ── -->
             <div id="seccion-resumen-pago" style="display:none;">
@@ -755,7 +764,7 @@
 
             </div><!-- /panel-clientes -->
 
-            <!-- ─── PANEL: COBROS ─────────────────────────────────── -->
+            <!-- ─── PANEL: PAGOS ──────────────────────────────────── -->
             <div id="dash-panel-pagos" class="dash-panel" style="display:none;">
 
                 <div class="kpi-seccion">Resumen de pagos</div>
@@ -774,19 +783,19 @@
                 <div class="kpi-grid kpi-2">
                     <div class="kpi-card">
                         <div class="kpi-label">Efectivo</div>
-                        <div class="kpi-valor" id="kpi-cob-ef">—</div>
+                        <div class="kpi-valor" id="kpi-pago-ef">—</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Yape</div>
-                        <div class="kpi-valor" id="kpi-cob-yp">—</div>
+                        <div class="kpi-valor" id="kpi-pago-yp">—</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Plin</div>
-                        <div class="kpi-valor" id="kpi-cob-pl">—</div>
+                        <div class="kpi-valor" id="kpi-pago-pl">—</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Giro</div>
-                        <div class="kpi-valor" id="kpi-cob-gi">—</div>
+                        <div class="kpi-valor" id="kpi-pago-gi">—</div>
                     </div>
                 </div>
 
@@ -940,6 +949,8 @@ function actualizarCategorias(tipoSelect, idx) {
 
     const otroWrap = document.getElementById(`otro-wrap-${idx}`);
     if (otroWrap) otroWrap.style.display = 'none';
+    actualizarResumen();
+    validarPreciosFormulario();
 }
 
 function buildTipoOptions() {
@@ -1004,6 +1015,7 @@ function actualizarCodigoCliente() {
         document.getElementById('chk-aplicar-credito').checked = false;
         document.getElementById('credito-aplicado-input').value = 0;
         document.getElementById('alerta-deuda-venta').style.display = 'none';
+        _limpiarAvisosCli();
         return;
     }
 
@@ -1090,6 +1102,100 @@ function actualizarCodigoCliente() {
     }, 300);
 }
 
+function verificarCampoCli(campo) {
+    const nombre = (document.getElementById('input-cliente-venta').value || '').trim().toLowerCase();
+    const data = CLIENTES_DATA[nombre];
+    const aviso = document.getElementById('aviso-cli-' + campo);
+    if (!aviso) return;
+
+    // Cliente nuevo — no hay conflicto
+    if (!data) { aviso.style.display = 'none'; _actualizarFlagCli(); return; }
+
+    let valorActual, valorDB;
+    if (campo === 'telefono') {
+        valorActual = (document.getElementById('input-telefono-venta').value || '').trim();
+        valorDB = data.telefono || '';
+    } else if (campo === 'email') {
+        valorActual = (document.getElementById('input-email-venta').value || '').trim();
+        valorDB = data.email || '';
+    } else if (campo === 'cumpleanos') {
+        valorActual = (document.getElementById('input-cumpleanos-venta').value || '').trim();
+        valorDB = data.cumpleanos ? parseToInputDate(data.cumpleanos) : '';
+    }
+
+    const label = campo === 'telefono' ? 'Teléfono' : campo === 'email' ? 'Email' : 'Fecha Nac.';
+
+    // No cambió — sin aviso
+    if (valorActual === valorDB) {
+        aviso.style.display = 'none';
+        aviso.dataset.aceptado = '';
+        _actualizarFlagCli();
+        return;
+    }
+
+    // Dato nuevo donde antes no había — informar que se guardará
+    if (!valorDB && valorActual) {
+        aviso.innerHTML = `<span style="color:#2e7d32;"><strong>${label}:</strong> se guardará <strong>${valorActual}</strong> en la ficha del cliente</span>`;
+        aviso.style.display = 'block';
+        aviso.dataset.aceptado = '';
+        _actualizarFlagCli();
+        return;
+    }
+
+    // Sobreescritura o borrado — pedir confirmación
+    const display = valorActual || '(vacío)';
+    const color = !valorActual ? '#C0392B' : '#e65100';
+    aviso.innerHTML = `<span style="color:${color};"><strong>${label}:</strong> ${valorDB} → <strong>${display}</strong></span>
+        <span style="margin-left:8px;">
+            <a href="#" onclick="aceptarCampoCli('${campo}');return false" style="color:#2e7d32;font-weight:bold;text-decoration:underline;">Actualizar</a>
+            &nbsp;|&nbsp;
+            <a href="#" onclick="rechazarCampoCli('${campo}');return false" style="color:#888;text-decoration:underline;">Restaurar</a>
+        </span>`;
+    aviso.style.display = 'block';
+    _actualizarFlagCli();
+}
+
+function aceptarCampoCli(campo) {
+    const aviso = document.getElementById('aviso-cli-' + campo);
+    aviso.innerHTML = '<span style="color:#2e7d32;font-weight:bold;">Se actualizará al guardar</span>';
+    aviso.dataset.aceptado = '1';
+    _actualizarFlagCli();
+}
+
+function rechazarCampoCli(campo) {
+    const nombre = (document.getElementById('input-cliente-venta').value || '').trim().toLowerCase();
+    const data = CLIENTES_DATA[nombre];
+    if (!data) return;
+    if (campo === 'telefono' && data.telefono)
+        document.getElementById('input-telefono-venta').value = data.telefono;
+    if (campo === 'email' && data.email)
+        document.getElementById('input-email-venta').value = data.email;
+    if (campo === 'cumpleanos' && data.cumpleanos)
+        document.getElementById('input-cumpleanos-venta').value = parseToInputDate(data.cumpleanos);
+    const aviso = document.getElementById('aviso-cli-' + campo);
+    aviso.style.display = 'none';
+    aviso.dataset.aceptado = '';
+    _actualizarFlagCli();
+}
+
+function _actualizarFlagCli() {
+    // Si algún campo fue aceptado para actualizar, poner flag=1
+    const campos = ['telefono', 'email', 'cumpleanos'];
+    const hayAceptado = campos.some(c => {
+        const av = document.getElementById('aviso-cli-' + c);
+        return av && av.dataset.aceptado === '1';
+    });
+    document.getElementById('actualizar-cliente-flag').value = hayAceptado ? '1' : '0';
+}
+
+function _limpiarAvisosCli() {
+    ['telefono', 'email', 'cumpleanos'].forEach(c => {
+        const av = document.getElementById('aviso-cli-' + c);
+        if (av) { av.style.display = 'none'; av.dataset.aceptado = ''; }
+    });
+    document.getElementById('actualizar-cliente-flag').value = '0';
+}
+
 function aplicarCredito() {
     const chk = document.getElementById('chk-aplicar-credito');
     const totalSoles = parseFloat(document.getElementById('total-cobrar-val').textContent) || 0;
@@ -1154,7 +1260,7 @@ function agregarItem() {
         </div>
         <div class="field">
             <label>Categoría</label>
-            <select name="categoria_${i}" onchange="toggleOtroItem(this, ${i})">
+            <select name="categoria_${i}" onchange="toggleOtroItem(this, ${i}); actualizarResumen(); validarPreciosFormulario();">
                 <option value="">— Seleccionar tipo primero —</option>
             </select>
         </div>
@@ -1370,30 +1476,80 @@ function quitarPromo(idx) {
     validarPreciosFormulario();
 }
 
-function validarPreciosFormulario() {
+function validarPreciosFormulario(esSubmit) {
     let hayError = false;
+
+    // Solo validar todos los campos al hacer submit
+    if (esSubmit) {
+        const fecha = document.getElementById('fecha-venta');
+        if (!fecha || !fecha.value) {
+            hayError = true;
+            if (fecha) fecha.style.border = '1.5px solid #e74c3c';
+        } else if (fecha) { fecha.style.border = ''; }
+
+        const cliente = document.getElementById('input-cliente-venta');
+        if (!cliente || !cliente.value.trim()) {
+            hayError = true;
+            if (cliente) cliente.style.border = '1.5px solid #e74c3c';
+        } else if (cliente) { cliente.style.border = ''; }
+    }
+
+    let hayItems = false;
     for (let i = 0; i < itemCount; i++) {
         if (!document.getElementById(`item-${i}`)) continue;
         const tipo = document.querySelector(`[name="tipo_${i}"]`)?.value || '';
-        if (!tipo) continue;
-        const precioInput = document.getElementById(`precio_orig_${i}`);
-        const precio = parseFloat(precioInput?.value || 0);
-        if (precioInput) {
-            if (!precio || precio <= 0) {
-                precioInput.style.border = '1.5px solid #e74c3c';
+        if (tipo) hayItems = true;
+
+        // Categoría (solo al submit)
+        if (esSubmit && tipo) {
+            const catSel = document.querySelector(`[name="categoria_${i}"]`);
+            const cat = catSel?.value || '';
+            if (!cat) {
                 hayError = true;
-            } else {
-                precioInput.style.border = '1.5px solid #ddd';
-            }
+                if (catSel) catSel.style.border = '1.5px solid #e74c3c';
+            } else if (catSel) { catSel.style.border = ''; }
+        }
+
+        // Precio (siempre — para feedback visual en tiempo real)
+        if (tipo) {
+            const precioInput = document.getElementById(`precio_orig_${i}`);
+            const precio = parseFloat(precioInput?.value || 0);
+            if (!precio || precio <= 0) {
+                hayError = true;
+                if (precioInput) precioInput.style.border = '1.5px solid #e74c3c';
+            } else if (precioInput) { precioInput.style.border = ''; }
         }
     }
+
+    if (esSubmit && !hayItems) hayError = true;
+
     const btn = document.getElementById('btn-guardar-venta');
-    if (btn) {
-        btn.disabled = hayError;
-        btn.style.opacity = hayError ? '0.5' : '';
-        btn.style.cursor  = hayError ? 'not-allowed' : '';
+
+    if (!esSubmit) {
+        // Llamada desde oninput: solo actualizar visual del botón, nunca bloquear
+        if (btn) {
+            btn.disabled = hayError;
+            btn.style.opacity = hayError ? '0.5' : '';
+            btn.style.cursor  = hayError ? 'not-allowed' : '';
+        }
+        return !hayError;
     }
-    return !hayError;
+
+    // Llamada desde submit
+    if (hayError) {
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+        return false;
+    }
+
+    // OK — bloquear para evitar doble envío
+    if (btn) {
+        btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+        btn.style.opacity = '0.65';
+        btn.style.cursor = 'not-allowed';
+    }
+    return true;
 }
 
 // Captura el precio de lista cuando el usuario interactúa con los checkboxes de promo
@@ -1644,10 +1800,45 @@ function getItemsData() {
 function actualizarResumen() {
     const items = getItemsData();
     const sec   = document.getElementById('seccion-resumen-pago');
+    const aviso = document.getElementById('aviso-faltan-campos');
     if (!sec) return;
 
-    if (items.length === 0) { sec.style.display = 'none'; return; }
+    // Verificar campos obligatorios: Cliente + por cada ítem: Tipo, Categoría, Precio
+    const faltantes = [];
+    const cliente = document.getElementById('input-cliente-venta')?.value?.trim() || '';
+    if (!cliente) faltantes.push('Falta seleccionar <strong>Cliente</strong>');
+
+    let hayAlgunItem = false;
+    for (let i = 0; i < itemCount; i++) {
+        if (!document.getElementById(`item-${i}`)) continue;
+        hayAlgunItem = true;
+        const tipo   = document.querySelector(`[name="tipo_${i}"]`)?.value || '';
+        const cat    = document.querySelector(`[name="categoria_${i}"]`)?.value || '';
+        const precio = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
+        const esGratis = document.getElementById(`es_gratis_flag_${i}`)?.value === '1';
+        const campos = [];
+        if (!tipo) campos.push('Tipo');
+        if (tipo && !cat) campos.push('Categoría');
+        if (!esGratis && precio <= 0) campos.push('Precio de venta');
+        if (campos.length > 0) faltantes.push(`Ítem ${i+1}: falta <strong>${campos.join('</strong>, <strong>')}</strong>`);
+    }
+
+    const todoCompleto = faltantes.length === 0 && hayAlgunItem;
+
+    // Mostrar/ocultar aviso
+    if (aviso) {
+        if (faltantes.length > 0 && hayAlgunItem) {
+            aviso.innerHTML = '⚠ Completa para continuar:<br>' + faltantes.join('<br>');
+            aviso.style.display = 'block';
+        } else {
+            aviso.style.display = 'none';
+        }
+    }
+
+    // Solo mostrar sección de pago cuando TODO está completo
+    if (!todoCompleto) { sec.style.display = 'none'; return; }
     sec.style.display = 'block';
+    if (aviso) aviso.style.display = 'none';
 
     // ── Tabla de resumen ──
     const totalSoles = items.reduce((s, it) => s + it.precioSoles, 0);
@@ -2719,7 +2910,8 @@ function cargarDashboard() {
                 });
                 html += '</tbody></table></div>';
             });
-            document.getElementById(elId).innerHTML = hayDatos ? html : '<p style="color:#aaa;font-size:13px;text-align:center;padding:16px;">Sin deudas pendientes ✓</p>';
+            const elAging = document.getElementById(elId);
+            if (elAging) elAging.innerHTML = hayDatos ? html : '<p style="color:#aaa;font-size:13px;text-align:center;padding:16px;">Sin deudas pendientes ✓</p>';
         }
         renderAging(d.deudores_aging, 'tabla-deudores-aging');
 
@@ -2727,10 +2919,10 @@ function cargarDashboard() {
         const pagosTotal = d.pagos_ef_efectivo + d.pagos_ef_yape + d.pagos_ef_plin + d.pagos_ef_giro;
         document.getElementById('kpi-pagos-total').textContent  = fmt(pagosTotal);
         document.getElementById('kpi-pagos-count').textContent  = d.pagos_recientes.length + (d.pagos_recientes.length === 10 ? '+' : '');
-        document.getElementById('kpi-cob-ef').textContent = fmt(d.pagos_ef_efectivo);
-        document.getElementById('kpi-cob-yp').textContent = fmt(d.pagos_ef_yape);
-        document.getElementById('kpi-cob-pl').textContent = fmt(d.pagos_ef_plin);
-        document.getElementById('kpi-cob-gi').textContent = fmt(d.pagos_ef_giro);
+        document.getElementById('kpi-pago-ef').textContent = fmt(d.pagos_ef_efectivo);
+        document.getElementById('kpi-pago-yp').textContent = fmt(d.pagos_ef_yape);
+        document.getElementById('kpi-pago-pl').textContent = fmt(d.pagos_ef_plin);
+        document.getElementById('kpi-pago-gi').textContent = fmt(d.pagos_ef_giro);
 
         // ── PAGOS: métodos donut ──
         destroyChart('metodos');
@@ -2741,7 +2933,7 @@ function cargarDashboard() {
             options: { plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}, cutout:'60%' }
         });
 
-        // ── PAGOS: tabla cobros recientes ──
+        // ── PAGOS: tabla pagos recientes ──
         let htmlCR='<table class="tabla-rec"><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Monto</th><th>Método</th></tr></thead><tbody>';
         if (d.pagos_recientes.length === 0) {
             htmlCR += '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px;">Sin pagos en este período</td></tr>';
@@ -2759,12 +2951,13 @@ function cargarDashboard() {
         document.getElementById('tabla-pagos-recientes').innerHTML = htmlCR + '</tbody></table>';
 
         // ── PAGOS: pendientes por antigüedad ──
-        renderAging(d.pendientes_cobro, 'tabla-pendientes-cobro');
+        renderAging(d.pendientes_pago, 'tabla-pendientes-pago');
 
         document.getElementById('dash-contenido').style.display = 'block';
         dashCargado = true;
-    }).catch(() => {
-        document.getElementById('dash-loading').textContent = 'Error al cargar datos.';
+    }).catch(err => {
+        console.error('Dashboard error:', err);
+        document.getElementById('dash-loading').textContent = 'Error al cargar datos: ' + err.message;
         document.getElementById('dash-loading').style.display = 'block';
     });
 }
@@ -2778,16 +2971,15 @@ cambiarTab = function(tab) {
 };
 
 // ── Anti-doble-envío: deshabilitar botón al hacer submit ─────────────────────
+// Excluir forms que manejan su propio botón (venta y pago)
 document.querySelectorAll('form').forEach(form => {
+    if (form.id === 'form-venta' || form.id === 'form-pago') return;
     form.addEventListener('submit', function(e) {
         const btn = this.querySelector('button[type="submit"]');
         if (!btn) return;
-        if (btn.disabled) {
-            e.preventDefault();  // ya fue enviado, bloquear segundo intento
-            return false;
-        }
-        btn.disabled = true;
+        if (btn.disabled) { e.preventDefault(); return false; }
         btn.dataset.originalText = btn.textContent;
+        btn.disabled = true;
         btn.textContent = 'Guardando...';
         btn.style.opacity = '0.65';
         btn.style.cursor = 'not-allowed';
