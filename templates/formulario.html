@@ -2148,7 +2148,7 @@ function actualizarTotalPago() {
     const previoRow      = document.getElementById('pago-resumen-previo-row');
     const asignadoRow    = document.getElementById('pago-resumen-asignado-row');
 
-    if (totalIngresado > 0 || total > 0 || pagosCreditoExistente > 0) {
+    if (totalIngresado > 0 || total > 0) {
         resumenWrap.style.display = 'block';
         document.getElementById('pago-resumen-ingresado').textContent = 'S/ ' + Math.round(totalIngresado);
 
@@ -2234,6 +2234,7 @@ function prepararEnvioPago() {
     if (!hayItems) {
         if (totalIngresado <= 0) {
             alert('Selecciona al menos un ítem o ingresa un método de pago.');
+            restaurarBotonPago();
             return false;
         }
         // Pago sin ítems seleccionados → registrar como crédito del cliente
@@ -2242,6 +2243,16 @@ function prepararEnvioPago() {
         addHidden('categoria_pago[]',  'CRÉDITO');
     }
     return true;
+}
+
+function restaurarBotonPago() {
+    const btn = document.querySelector('#form-pago button[type="submit"]');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || 'REGISTRAR PAGO';
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+    }
 }
 
 function parseFechaStr(s) {
