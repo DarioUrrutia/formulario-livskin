@@ -526,40 +526,29 @@
                 <input type="text" name="notas_pago" placeholder="Observaciones adicionales">
             </div>
 
-            <!-- Resumen de pago: ingresado vs. asignado -->
+            <!-- Resumen de pago: ingresado vs. asignado vs. saldo total -->
             <div id="pago-resumen-wrap" style="display:none; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:10px 14px; margin-top:12px; font-size:13px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                    <span style="color:#666;">Total ingresado:</span>
+                    <span style="color:#666;">Total ingresado hoy:</span>
                     <span id="pago-resumen-ingresado" style="font-weight:bold;">S/ 0</span>
                 </div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <div id="pago-resumen-asignado-row" style="display:flex;justify-content:space-between;margin-bottom:4px;">
                     <span style="color:#666;">Asignado a ítems:</span>
                     <span id="pago-resumen-asignado" style="font-weight:bold;">S/ 0</span>
                 </div>
-                <div id="pago-credito-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #ffeaa7; background:#fffdf0; border-radius:5px; padding:6px 8px;">
-                    <span style="color:#e67e22; font-weight:bold;">Crédito a favor:</span>
-                    <span id="pago-credito-monto" style="color:#e67e22; font-weight:bold;">S/ 0</span>
+                <div id="pago-resumen-previo-row" style="display:none; justify-content:space-between; margin-bottom:4px;">
+                    <span style="color:#856404;">Crédito previo:</span>
+                    <span id="pago-resumen-previo" style="color:#856404; font-weight:bold;">S/ 0</span>
                 </div>
-                <div style="font-size:11px; color:#aaa; margin-top:4px; display:none;" id="pago-credito-nota">Se registrará automáticamente como crédito del cliente.</div>
-                <div id="pago-falta-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #f5c6cb; background:#fff5f5; border-radius:5px; padding:6px 8px;">
+                <div id="pago-falta-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 8px; border-radius:5px; background:#fff5f5; border:1px solid #f5c6cb;">
                     <span style="color:#c0392b; font-weight:bold;">Falta por pagar:</span>
                     <span id="pago-falta-monto" style="color:#c0392b; font-weight:bold;">S/ 0</span>
                 </div>
-            </div>
-
-            <!-- Sección de crédito -->
-            <div style="margin-top:20px;border-top:1px dashed #ddd;padding-top:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <div>
-                        <div class="seccion" style="margin:0;">Crédito a favor del cliente</div>
-                        <div style="font-size:11px;color:#aaa;margin-top:2px;">El cliente deja dinero extra sin asignar a un servicio específico.</div>
-                    </div>
-                    <button type="button" onclick="agregarAnticipo()"
-                        style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;color:#555;">
-                        + Agregar crédito
-                    </button>
+                <div id="pago-credito-row" style="display:none; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 8px; border-radius:5px; background:#fffdf0; border:1px solid #ffd966;">
+                    <span style="color:#856404; font-weight:bold;">Saldo a favor al registrar:</span>
+                    <span id="pago-credito-monto" style="color:#856404; font-weight:bold;">S/ 0</span>
                 </div>
-                <div id="anticipos-list"></div>
+                <div style="font-size:11px; color:#aaa; margin-top:4px; display:none;" id="pago-credito-nota">El exceso se registrará automáticamente como crédito del cliente.</div>
             </div>
 
             <button type="submit">REGISTRAR PAGO</button>
@@ -1965,6 +1954,7 @@ function actualizarMonedaBadges() {} // deprecated, mantenida para compatibilida
 // ── Tab Pagos: multi-selección con monto por ítem ────────────────────────────
 let pagosDeudaTimer = null;
 let pagoItemsData = []; // guarda los datos de cada ítem cargado
+let pagosCreditoExistente = 0; // crédito previo del cliente cargado
 
 function cargarDeudaCliente() {
     const nombre = document.getElementById('input-cliente-pago').value.trim();
@@ -1975,6 +1965,7 @@ function cargarDeudaCliente() {
         wrap.style.display = 'none';
         creditoWrap.style.display = 'none';
         pagoItemsData = [];
+        pagosCreditoExistente = 0;
         return;
     }
 
@@ -1988,6 +1979,7 @@ function cargarDeudaCliente() {
                     (c.CATEGORIA || '').startsWith('ANTICIPO')
                 );
                 const creditoExistente = pagosCredito.reduce((s, c) => s + parseFloat(c.MONTO || 0), 0);
+                pagosCreditoExistente = creditoExistente;
                 if (creditoExistente > 0.5) {
                     creditoWrap.style.display = 'block';
                     document.getElementById('pago-credito-disponible-monto').textContent = 'S/ ' + Math.round(creditoExistente);
@@ -1999,6 +1991,7 @@ function cargarDeudaCliente() {
                 } else {
                     creditoWrap.style.display = 'none';
                 }
+                actualizarTotalPago(); // refrescar resumen con nuevo crédito previo
 
                 // ── Ítems con deuda pendiente ──────────────────────────────────
                 wrap.style.display = 'block';
@@ -2126,33 +2119,57 @@ function actualizarTotalPago() {
         wrap.style.display = 'none';
     }
 
-    // Resumen ingresado vs asignado
+    // Resumen ingresado vs asignado vs crédito previo
     const ef = parseFloat(document.getElementById('pago-ef-efectivo')?.value || 0);
     const ya = parseFloat(document.getElementById('pago-ef-yape')?.value || 0);
     const pl = parseFloat(document.getElementById('pago-ef-plin')?.value || 0);
     const gi = parseFloat(document.getElementById('pago-ef-giro')?.value || 0);
     const totalIngresado = ef + ya + pl + gi;
-    const exceso = Math.round(totalIngresado - total);
+    // exceso de hoy = dinero ingresado que sobra después de cubrir ítems
+    const excesoHoy  = Math.max(0, totalIngresado - total);
+    // falta de hoy = deuda de ítems marcados que el pago de hoy no alcanza a cubrir
+    const faltaHoy   = Math.max(0, total - totalIngresado);
+    // saldo final a favor = crédito previo + exceso de hoy
+    const saldoFinal = Math.round(pagosCreditoExistente + excesoHoy);
 
-    const resumenWrap  = document.getElementById('pago-resumen-wrap');
-    const creditoRow   = document.getElementById('pago-credito-row');
-    const creditoNota  = document.getElementById('pago-credito-nota');
-    const faltaRow     = document.getElementById('pago-falta-row');
+    const resumenWrap    = document.getElementById('pago-resumen-wrap');
+    const creditoRow     = document.getElementById('pago-credito-row');
+    const creditoNota    = document.getElementById('pago-credito-nota');
+    const faltaRow       = document.getElementById('pago-falta-row');
+    const previoRow      = document.getElementById('pago-resumen-previo-row');
+    const asignadoRow    = document.getElementById('pago-resumen-asignado-row');
 
-    if (totalIngresado > 0 || total > 0) {
+    if (totalIngresado > 0 || total > 0 || pagosCreditoExistente > 0) {
         resumenWrap.style.display = 'block';
         document.getElementById('pago-resumen-ingresado').textContent = 'S/ ' + Math.round(totalIngresado);
-        document.getElementById('pago-resumen-asignado').textContent  = 'S/ ' + Math.round(total);
-        if (exceso > 0) {
-            creditoRow.style.display  = 'flex';
-            creditoNota.style.display = 'block';
-            document.getElementById('pago-credito-monto').textContent = 'S/ ' + exceso;
-            faltaRow.style.display    = 'none';
-        } else if (exceso < -1) {
+
+        // Fila "Asignado a ítems" solo si hay ítems seleccionados
+        if (total > 0) {
+            asignadoRow.style.display = 'flex';
+            document.getElementById('pago-resumen-asignado').textContent = 'S/ ' + Math.round(total);
+        } else {
+            asignadoRow.style.display = 'none';
+        }
+
+        // Fila "Crédito previo" solo si el cliente tiene saldo anterior
+        if (pagosCreditoExistente > 0.5) {
+            previoRow.style.display = 'flex';
+            document.getElementById('pago-resumen-previo').textContent = 'S/ ' + Math.round(pagosCreditoExistente);
+        } else {
+            previoRow.style.display = 'none';
+        }
+
+        // Resultado final
+        if (faltaHoy > 1) {
             faltaRow.style.display    = 'flex';
-            document.getElementById('pago-falta-monto').textContent   = 'S/ ' + Math.abs(exceso);
+            document.getElementById('pago-falta-monto').textContent = 'S/ ' + Math.round(faltaHoy);
             creditoRow.style.display  = 'none';
             creditoNota.style.display = 'none';
+        } else if (saldoFinal > 0) {
+            creditoRow.style.display  = 'flex';
+            creditoNota.style.display = excesoHoy > 0 ? 'block' : 'none';
+            document.getElementById('pago-credito-monto').textContent = 'S/ ' + saldoFinal;
+            faltaRow.style.display    = 'none';
         } else {
             creditoRow.style.display  = 'none';
             creditoNota.style.display = 'none';
@@ -2161,31 +2178,6 @@ function actualizarTotalPago() {
     } else {
         resumenWrap.style.display = 'none';
     }
-}
-
-let anticipoCount = 0;
-
-function agregarAnticipo() {
-    anticipoCount++;
-    const id = anticipoCount;
-    const div = document.createElement('div');
-    div.id = 'anticipo-row-' + id;
-    div.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;background:#fffdf0;border:1px solid #ffeaa7;border-radius:7px;padding:8px 10px;';
-    div.innerHTML = `
-        <div style="flex:1;">
-            <div style="font-size:11px;color:#888;margin-bottom:3px;">Nota (opcional)</div>
-            <input type="text" id="anticipo-desc-${id}" placeholder="Ej: para próxima sesión, regalo, etc."
-                style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;">
-        </div>
-        <div style="flex-shrink:0;width:90px;">
-            <div style="font-size:11px;color:#888;margin-bottom:3px;">Monto S/</div>
-            <input type="number" id="anticipo-monto-${id}" placeholder="0" min="0" step="1"
-                style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;text-align:right;">
-        </div>
-        <button type="button" onclick="document.getElementById('anticipo-row-${id}').remove()"
-            style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>
-    `;
-    document.getElementById('anticipos-list').appendChild(div);
 }
 
 function prepararEnvioPago() {
@@ -2212,22 +2204,7 @@ function prepararEnvioPago() {
         addHidden('categoria_pago[]',  v.CATEGORIA  || '');
     });
 
-    // Agregar anticipos manuales de la sección "Agregar crédito"
-    let hayAnticipos = false;
-    for (let i = 1; i <= anticipoCount; i++) {
-        const descEl  = document.getElementById('anticipo-desc-' + i);
-        const montoEl = document.getElementById('anticipo-monto-' + i);
-        if (!descEl || !montoEl) continue; // fue eliminado
-        const monto = parseFloat(montoEl.value || 0);
-        if (monto <= 0) continue;
-        const desc = descEl.value.trim() || 'Servicio futuro';
-        hayAnticipos = true;
-        addHidden('cod_item_pago[]',   '');
-        addHidden('monto_item_pago[]', Math.round(monto));
-        addHidden('categoria_pago[]',  desc ? 'CRÉDITO: ' + desc : 'CRÉDITO');
-    }
-
-    // Auto-crédito: si el total ingresado supera lo asignado a ítems + anticipos
+    // Auto-crédito: si el total ingresado supera lo asignado a ítems
     const ef = parseFloat(document.getElementById('pago-ef-efectivo')?.value || 0);
     const ya = parseFloat(document.getElementById('pago-ef-yape')?.value || 0);
     const pl = parseFloat(document.getElementById('pago-ef-plin')?.value || 0);
@@ -2244,10 +2221,10 @@ function prepararEnvioPago() {
         addHidden('categoria_pago[]',  'CRÉDITO');
     }
 
-    // Validar que haya algo que cobrar
-    if (!hayItems && !hayAnticipos) {
+    // Validar que haya algo que registrar
+    if (!hayItems) {
         if (totalIngresado <= 0) {
-            alert('Selecciona al menos un ítem, agrega un anticipo, o ingresa un método de pago.');
+            alert('Selecciona al menos un ítem o ingresa un método de pago.');
             return false;
         }
         // Pago libre sin referencia a ítems
