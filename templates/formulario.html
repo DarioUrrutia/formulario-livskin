@@ -3231,7 +3231,7 @@ function renderLibro(movimientos) {
     const tipoDot   = { venta: '🟢', pago: '🔵', gasto: '🔴' };
     const tipoColor = { venta: '#27ae60', pago: '#2980b9', gasto: '#C0392B' };
 
-    let html = `<table id="libro-table" style="width:100%;min-width:700px;border-collapse:collapse;font-size:13px;">
+    let html = `<table id="libro-table" style="width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;">
         <thead><tr style="background:#f5f5f5;text-align:left;position:sticky;top:0;z-index:1;">
             <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Fecha</th>
             <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Tipo</th>
@@ -3284,8 +3284,8 @@ function renderLibro(movimientos) {
             <td style="padding:7px 6px;color:${tipoColor[m._tipo]};font-weight:bold;white-space:nowrap;">${tipoDot[m._tipo]} ${tipoLabel[m._tipo]}</td>
             <td style="padding:7px 6px;">${m.cliente}</td>
             <td class="libro-col-cat" style="padding:7px 6px;">${m.categoria}</td>
-            <td style="padding:7px 6px;text-align:right;font-weight:bold;white-space:nowrap;">S/ ${Math.round(m.monto).toLocaleString()}</td>
-            <td style="padding:7px 6px;white-space:nowrap;">${estado}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:bold;">S/ ${Math.round(m.monto).toLocaleString()}</td>
+            <td style="padding:7px 6px;">${estado}</td>
         </tr>`;
     });
     html += '</tbody></table>';
