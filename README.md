@@ -16,7 +16,7 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - **Distribución automática de pago**: todos los ítems se rellenan en orden al ingresar el pago; siempre editables manualmente
 - **Alerta de deuda anterior**: si el cliente tiene saldo pendiente, aparece un aviso al buscarlo y se muestra una sección para abonar a esas deudas dentro del mismo registro
 - **Promociones y descuentos por ítem**: opción `Gratis` o `Descuento S/` directamente en cada ítem
-  - **Gratis**: el campo de precio sigue visible como referencia, pero TOTAL = 0; no entra en facturado ni por cobrar; la distribución de pago ignora ese ítem; cualquier pago recibido queda como saldo a favor o cubre deudas anteriores
+  - **Gratis**: el campo de precio sigue visible como referencia, pero TOTAL = 0; no entra en facturado ni por cobrar; en el desglose de distribución de pago aparece como etiqueta fija "GRATIS" (sin campo editable); la distribución automática salta ese ítem; cualquier pago recibido queda como saldo a favor o cubre deudas anteriores
   - **Descuento**: precio cobrado = lista − descuento; se registra el monto cedido en `DESCUENTO S/`; el descuento no puede ser mayor o igual al precio de venta
   - Validación doble (frontend + backend) para garantizar integridad
 - **Campos obligatorios con validación progresiva**: la sección de pago solo aparece cuando Cliente, Tipo, Categoría y Precio están completos; un aviso amarillo en tiempo real indica exactamente qué falta por llenar
