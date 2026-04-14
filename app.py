@@ -1164,6 +1164,60 @@ def api_dashboard():
         "pendientes_pago":    pendientes_pago,
     })
 
+@app.route("/api/libro")
+def api_libro():
+    """Devuelve TODOS los movimientos (ventas, pagos, gastos) como JSON.
+    Solo lectura — NO modifica la Sheet. Usa el mismo cache de 90s."""
+    try:
+        ventas_ws, gastos_ws, pagos_ws, _ = get_sheets()
+        todas_ventas = _get_cached_values(ventas_ws, "ventas")
+        todos_pagos  = _get_cached_values(pagos_ws, "pagos")
+        todos_gastos = _get_cached_values(gastos_ws, "gastos")
+
+        ventas_out = []
+        for fila in todas_ventas[1:]:
+            if not any(fila):
+                continue
+            def v(i): return fila[i].strip() if i < len(fila) else ""
+            ventas_out.append({
+                "num": v(0), "fecha": v(1), "cod_cliente": v(2), "cliente": v(3),
+                "telefono": v(4), "tipo": v(5), "cod_item": v(6), "categoria": v(7),
+                "zona": v(8), "proxima_cita": v(9), "fecha_nac": v(10),
+                "moneda": v(11), "total": parse_num(v(12)),
+                "efectivo": parse_num(v(13)), "yape": parse_num(v(14)),
+                "plin": parse_num(v(15)), "giro": parse_num(v(16)),
+                "debe": parse_num(v(17)), "pagado": parse_num(v(18)), "tc": v(19),
+                "precio_lista": parse_num(v(20)), "descuento": parse_num(v(21)),
+            })
+
+        pagos_out = []
+        for fila in todos_pagos[1:]:
+            if not any(fila):
+                continue
+            def p(i): return fila[i].strip() if i < len(fila) else ""
+            pagos_out.append({
+                "num": p(0), "fecha": p(1), "cod_cliente": p(2), "cliente": p(3),
+                "monto": parse_num(p(4)),
+                "efectivo": parse_num(p(5)), "yape": parse_num(p(6)),
+                "plin": parse_num(p(7)), "giro": parse_num(p(8)),
+                "notas": p(9), "cod_item": p(10), "categoria": p(11), "cod_pago": p(12),
+            })
+
+        gastos_out = []
+        for fila in todos_gastos[1:]:
+            if not any(fila):
+                continue
+            def g(i): return fila[i].strip() if i < len(fila) else ""
+            gastos_out.append({
+                "num": g(0), "fecha": g(1), "tipo": g(2), "descripcion": g(3),
+                "destinatario": g(4), "monto": parse_num(g(5)), "metodo_pago": g(6),
+            })
+
+        return jsonify({"ventas": ventas_out, "pagos": pagos_out, "gastos": gastos_out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/config")
 def api_config():
     """Devuelve los tipos, categorías y áreas configurados en la hoja Listas."""

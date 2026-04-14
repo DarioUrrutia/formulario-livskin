@@ -77,6 +77,17 @@ Sistema de gestión interno para **Livskin Professional Skincare** — registro 
 - Tabla de pagos recientes
 - **Pendientes de pago por antigüedad**: misma clasificación de buckets que deudores, con detalle por ítem
 
+### Pestaña Libro
+- **Libro de movimientos**: vista de TODOS los movimientos del negocio (ventas, pagos, gastos) en una sola tabla filtrable — 100% lectura, no modifica la base de datos
+- **Filtros**: por fecha (desde/hasta), tipo (venta/pago/gasto), cliente, categoría, método de pago
+- **Trazabilidad venta↔pago**: cada venta muestra su estado (✅ Pagado / ⚠ Debe S/X / 🎁 Gratis) junto con su código LIVTRAT; cada pago muestra → LIVTRAT del ítem que paga — de un vistazo se ve qué pago corresponde a qué venta
+- **Orden por flujo real**: dentro del mismo día, cada venta aparece seguida de su pago correspondiente
+- **Detalle de transacción**: click en cualquier fila abre un modal con todos los campos, sección "Cómo se calculó" (precio lista, descuento, total), pagos recibidos con trazabilidad, y datos crudos de la Sheet
+- **Tres casos de cálculo**: venta normal (precio directo), con descuento (precio original − descuento), gratis (TOTAL = 0 con precio de referencia)
+- **Exportar CSV**: descarga los movimientos filtrados como archivo .csv para abrir en Excel
+- **Totales en tiempo real**: ventas, pagos, gastos y balance se recalculan según los filtros activos
+- **Responsive**: tabla con scroll horizontal y vertical, headers fijos al scrollear
+
 ---
 
 ## Tecnologías

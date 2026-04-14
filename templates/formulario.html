@@ -245,6 +245,7 @@
         <button class="tab-btn" data-tab="pagos"     onclick="cambiarTab('pagos')">Pagos</button>
         <button class="tab-btn" data-tab="cliente"   onclick="cambiarTab('cliente')">Cliente</button>
         <button class="tab-btn" data-tab="dashboard" onclick="cambiarTab('dashboard')">Dashboard</button>
+        <button class="tab-btn" data-tab="libro"     onclick="cambiarTab('libro'); cargarLibro();">Libro</button>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ TAB: VENTA -->
@@ -820,6 +821,79 @@
         </div><!-- /dash-contenido -->
     </div>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ═══ TAB: LIBRO DE MOVIMIENTOS ══════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="tab-libro" class="tab-content form-body" style="padding:16px;">
+
+    <div class="seccion">Libro de movimientos</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">
+        Todos los movimientos del negocio (ventas, pagos, gastos) con trazabilidad completa.
+        Nada se modifica — esta vista es 100% de lectura.
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:end;">
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Desde</label>
+            <input type="date" id="libro-desde" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Hasta</label>
+            <input type="date" id="libro-hasta" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Tipo</label>
+            <select id="libro-tipo" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+                <option value="">Todos</option>
+                <option value="venta">Ventas</option>
+                <option value="pago">Pagos</option>
+                <option value="gasto">Gastos</option>
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Cliente</label>
+            <input type="text" id="libro-cliente" list="lista-clientes-buscar" placeholder="Todos"
+                   style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:140px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Categoría</label>
+            <input type="text" id="libro-categoria" placeholder="Todas"
+                   style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:120px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <label style="font-size:11px;color:#888;">Método pago</label>
+            <select id="libro-metodo" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+                <option value="">Todos</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="yape">Yape</option>
+                <option value="plin">Plin</option>
+                <option value="giro">Giro</option>
+            </select>
+        </div>
+        <button onclick="filtrarLibro()" style="padding:6px 14px;background:#C0392B;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;">Filtrar</button>
+        <button onclick="limpiarFiltrosLibro()" style="padding:6px 14px;background:#f0f0f0;color:#333;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;">Limpiar</button>
+        <button onclick="exportarLibroCSV()" style="padding:6px 14px;background:#27ae60;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;">Exportar CSV</button>
+    </div>
+
+    <!-- Contador de resultados -->
+    <div id="libro-contador" style="font-size:12px;color:#888;margin-bottom:8px;"></div>
+
+    <!-- Totales del filtro -->
+    <div id="libro-totales" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;"></div>
+
+    <!-- Tabla de movimientos -->
+    <div id="libro-tabla" style="overflow-y:auto;overflow-x:scroll;max-height:80vh;border:1px solid #e0e0e0;border-radius:8px;"></div>
+
+    <!-- Modal de detalle -->
+    <div id="libro-detalle-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;overflow-y:auto;" onclick="if(event.target===this)cerrarDetalleLibro()">
+        <div style="max-width:600px;margin:40px auto;background:white;border-radius:12px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,0.2);position:relative;">
+            <button onclick="cerrarDetalleLibro()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#888;">&times;</button>
+            <div id="libro-detalle-contenido"></div>
+        </div>
+    </div>
+
+</div><!-- /tab-libro -->
+
 </div><!-- /card -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -906,6 +980,13 @@
     .tabla-rec td { padding:6px 8px; border-bottom:1px solid #f5f5f5; vertical-align:top; }
     .tabla-rec tr:last-child td { border-bottom:none; }
     .debe-badge { color:#C0392B; font-weight:bold; font-size:11px; }
+
+    /* ── Libro de movimientos: responsive ── */
+    @media (max-width: 600px) {
+        .libro-col-cat { display: none; }
+        #libro-table { font-size: 12px; }
+        #libro-table th, #libro-table td { padding: 5px 4px; }
+    }
 </style>
 <script>
 // ── Evitar que el scroll del mouse cambie inputs numéricos ───────────────────
@@ -3014,6 +3095,453 @@ document.querySelectorAll('form').forEach(form => {
 
 // Cargar primer ítem al iniciar
 cargarConfig().then(() => agregarItem());
+
+// ══════════════════════════════════════════════════════════════════════
+// ═══ LIBRO DE MOVIMIENTOS — Transparencia total de datos ═════════════
+// ══════════════════════════════════════════════════════════════════════
+
+let libroData = null;       // Cache de datos del /api/libro
+let libroFiltrado = null;   // Datos después de aplicar filtros
+
+function cargarLibro() {
+    if (libroData) { filtrarLibro(); return; }
+    const container = document.getElementById('libro-tabla');
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa;">Cargando movimientos...</div>';
+    fetch('/api/libro')
+        .then(r => r.json())
+        .then(data => {
+            libroData = data;
+            filtrarLibro();
+        })
+        .catch(() => { container.innerHTML = '<div style="color:#C0392B;padding:20px;">Error al cargar datos.</div>'; });
+}
+
+function filtrarLibro() {
+    if (!libroData) return;
+    const desde    = document.getElementById('libro-desde').value;
+    const hasta    = document.getElementById('libro-hasta').value;
+    const tipo     = document.getElementById('libro-tipo').value;
+    const cliente  = document.getElementById('libro-cliente').value.trim().toLowerCase();
+    const categoria = document.getElementById('libro-categoria').value.trim().toLowerCase();
+    const metodo   = document.getElementById('libro-metodo').value;
+
+    // Unificar todos los movimientos en un solo array con tipo marcado
+    let movimientos = [];
+    if (!tipo || tipo === 'venta') {
+        libroData.ventas.forEach(v => {
+            let met = '';
+            if (v.efectivo > 0) met = 'efectivo';
+            else if (v.yape > 0) met = 'yape';
+            else if (v.plin > 0) met = 'plin';
+            else if (v.giro > 0) met = 'giro';
+            movimientos.push({
+                _tipo: 'venta', fecha: v.fecha, cliente: v.cliente, categoria: v.categoria,
+                monto: v.total, metodo: met, codigo: v.cod_item, vinculado_a: '', _raw: v
+            });
+        });
+    }
+    if (!tipo || tipo === 'pago') {
+        libroData.pagos.forEach(p => {
+            let met = '';
+            if (p.efectivo > 0) met = 'efectivo';
+            else if (p.yape > 0) met = 'yape';
+            else if (p.plin > 0) met = 'plin';
+            else if (p.giro > 0) met = 'giro';
+            movimientos.push({
+                _tipo: 'pago', fecha: p.fecha, cliente: p.cliente, categoria: p.categoria,
+                monto: p.monto, metodo: met, codigo: p.cod_pago, vinculado_a: p.cod_item || '', _raw: p
+            });
+        });
+    }
+    if (!tipo || tipo === 'gasto') {
+        libroData.gastos.forEach(g => {
+            movimientos.push({
+                _tipo: 'gasto', fecha: g.fecha, cliente: g.destinatario || '—',
+                categoria: g.tipo, monto: g.monto, metodo: g.metodo_pago || '', codigo: '', vinculado_a: '', _raw: g
+            });
+        });
+    }
+
+    // Aplicar filtros
+    if (desde) movimientos = movimientos.filter(m => m.fecha >= desde);
+    if (hasta) movimientos = movimientos.filter(m => m.fecha <= hasta);
+    if (cliente) movimientos = movimientos.filter(m => m.cliente.toLowerCase().includes(cliente));
+    if (categoria) movimientos = movimientos.filter(m => m.categoria.toLowerCase().includes(categoria));
+    if (metodo) movimientos = movimientos.filter(m => m.metodo.toLowerCase().includes(metodo));
+
+    // Ordenar: fecha desc, dentro del mismo día: venta → su pago (agrupados por COD_ITEM)
+    movimientos.sort((a, b) => {
+        if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
+        const codA = a._tipo === 'venta' ? a.codigo : (a.vinculado_a || '');
+        const codB = b._tipo === 'venta' ? b.codigo : (b.vinculado_a || '');
+        if (codA && codB && codA !== codB) return codA.localeCompare(codB);
+        const prioA = a._tipo === 'venta' ? 0 : a._tipo === 'pago' ? 1 : 2;
+        const prioB = b._tipo === 'venta' ? 0 : b._tipo === 'pago' ? 1 : 2;
+        return prioA - prioB;
+    });
+
+    libroFiltrado = movimientos;
+    renderLibro(movimientos);
+}
+
+function renderLibro(movimientos) {
+    // Contador
+    const nVentas = movimientos.filter(m => m._tipo === 'venta').length;
+    const nPagos  = movimientos.filter(m => m._tipo === 'pago').length;
+    const nGastos = movimientos.filter(m => m._tipo === 'gasto').length;
+    document.getElementById('libro-contador').textContent =
+        `Mostrando ${movimientos.length} movimientos (${nVentas} ventas, ${nPagos} pagos, ${nGastos} gastos)`;
+
+    // Totales
+    const totVentas = movimientos.filter(m => m._tipo === 'venta').reduce((s, m) => s + m.monto, 0);
+    const totPagos  = movimientos.filter(m => m._tipo === 'pago').reduce((s, m) => s + m.monto, 0);
+    const totGastos = movimientos.filter(m => m._tipo === 'gasto').reduce((s, m) => s + m.monto, 0);
+    const balance = totVentas - totPagos - totGastos;
+    document.getElementById('libro-totales').innerHTML = `
+        <div style="background:#e8f8e8;padding:8px 14px;border-radius:8px;font-size:13px;">
+            <strong>Ventas:</strong> S/ ${Math.round(totVentas).toLocaleString()}
+        </div>
+        <div style="background:#e0f0ff;padding:8px 14px;border-radius:8px;font-size:13px;">
+            <strong>Pagos:</strong> S/ ${Math.round(totPagos).toLocaleString()}
+        </div>
+        <div style="background:#ffe8e8;padding:8px 14px;border-radius:8px;font-size:13px;">
+            <strong>Gastos:</strong> S/ ${Math.round(totGastos).toLocaleString()}
+        </div>
+        <div style="background:#f8f4e8;padding:8px 14px;border-radius:8px;font-size:13px;">
+            <strong>Balance:</strong> S/ ${Math.round(balance).toLocaleString()}
+        </div>`;
+
+    if (movimientos.length === 0) {
+        document.getElementById('libro-tabla').innerHTML =
+            '<div style="text-align:center;padding:20px;color:#aaa;">No hay movimientos con estos filtros.</div>';
+        return;
+    }
+
+    // Pre-computar: total pagado por cada COD_ITEM (para saber si una venta está pagada o no)
+    const pagosPorItem = {};
+    if (libroData) {
+        libroData.pagos.forEach(p => {
+            if (p.cod_item) {
+                pagosPorItem[p.cod_item] = (pagosPorItem[p.cod_item] || 0) + p.monto;
+            }
+        });
+    }
+
+    const tipoLabel = { venta: 'Venta', pago: 'Pago', gasto: 'Gasto' };
+    const tipoDot   = { venta: '🟢', pago: '🔵', gasto: '🔴' };
+    const tipoColor = { venta: '#27ae60', pago: '#2980b9', gasto: '#C0392B' };
+
+    let html = `<table id="libro-table" style="width:100%;min-width:700px;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f5f5f5;text-align:left;position:sticky;top:0;z-index:1;">
+            <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Fecha</th>
+            <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Tipo</th>
+            <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Cliente</th>
+            <th class="libro-col-cat" style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Categoría</th>
+            <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;text-align:right;">Monto</th>
+            <th style="padding:8px 6px;border-bottom:2px solid #ddd;background:#f5f5f5;">Estado</th>
+        </tr></thead><tbody>`;
+
+    // Mapa COD_ITEM → descripción legible (para mostrar en pagos qué se pagó)
+    const ventaInfo = {};
+    if (libroData) {
+        libroData.ventas.forEach(v => {
+            if (v.cod_item) {
+                const clienteCorto = v.cliente.length > 15 ? v.cliente.substring(0, 15) + '..' : v.cliente;
+                ventaInfo[v.cod_item] = `${v.categoria} (${clienteCorto})`;
+            }
+        });
+    }
+
+    movimientos.forEach((m, idx) => {
+        const fechaFmt = m.fecha ? m.fecha.split('-').reverse().join('/') : '';
+        const codEnlace = m._tipo === 'venta' ? m.codigo : m.vinculado_a;
+
+        // Calcular Estado según tipo
+        let estado = '';
+        if (m._tipo === 'venta') {
+            const totalPagado = pagosPorItem[m.codigo] || 0;
+            const debe = m.monto - totalPagado;
+            const cod = m.codigo ? ` · <span style="color:#888;font-size:11px;">${m.codigo}</span>` : '';
+            if (m.monto === 0) {
+                estado = `<span style="color:#27ae60;font-weight:bold;">🎁 Gratis</span>${cod}`;
+            } else if (debe <= 0.5) {
+                estado = `<span style="color:#27ae60;font-weight:bold;">✅ Pagado</span>${cod}`;
+            } else {
+                estado = `<span style="color:#C0392B;font-weight:bold;">⚠ Debe S/${Math.round(debe)}</span>${cod}`;
+            }
+        } else if (m._tipo === 'pago') {
+            if (m.vinculado_a) {
+                estado = `<span class="libro-enlace" data-enlace="${m.vinculado_a}" style="color:#2980b9;cursor:pointer;font-size:12px;" onclick="event.stopPropagation();toggleResaltado('${m.vinculado_a}')">→ ${m.vinculado_a}</span>`;
+            } else {
+                estado = '<span style="color:#888;font-size:12px;">sin vínculo</span>';
+            }
+        } else {
+            estado = '<span style="color:#888;">—</span>';
+        }
+
+        html += `<tr data-cod-enlace="${codEnlace}" style="border-bottom:1px solid #f0f0f0;cursor:pointer;" onclick="mostrarDetalleLibro(${idx})">
+            <td style="padding:7px 6px;white-space:nowrap;">${fechaFmt}</td>
+            <td style="padding:7px 6px;color:${tipoColor[m._tipo]};font-weight:bold;white-space:nowrap;">${tipoDot[m._tipo]} ${tipoLabel[m._tipo]}</td>
+            <td style="padding:7px 6px;">${m.cliente}</td>
+            <td class="libro-col-cat" style="padding:7px 6px;">${m.categoria}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:bold;white-space:nowrap;">S/ ${Math.round(m.monto).toLocaleString()}</td>
+            <td style="padding:7px 6px;white-space:nowrap;">${estado}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('libro-tabla').innerHTML = html;
+}
+
+function mostrarDetalleLibro(idx) {
+    const m = libroFiltrado[idx];
+    if (!m) return;
+    const raw = m._raw;
+    let html = '';
+
+    if (m._tipo === 'venta') {
+        // Buscar pagos relacionados a este COD_ITEM
+        const pagosRelacionados = libroData.pagos.filter(p => p.cod_item === raw.cod_item);
+        const totalPagado = pagosRelacionados.reduce((s, p) => s + p.monto, 0);
+        const debeReal = raw.total - totalPagado;
+
+        html = `
+        <div style="font-size:11px;text-transform:uppercase;color:#27ae60;font-weight:bold;letter-spacing:1px;margin-bottom:8px;">Detalle de Venta</div>
+        <div style="font-size:18px;font-weight:bold;margin-bottom:4px;">${raw.categoria} — ${raw.tipo}</div>
+        <div style="font-size:13px;color:#888;margin-bottom:16px;">${raw.cod_item} · ${raw.fecha ? raw.fecha.split('-').reverse().join('/') : ''}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Cliente</div>
+                <div style="font-weight:bold;">${raw.cliente}</div>
+                <div style="font-size:11px;color:#aaa;">${raw.cod_cliente}</div>
+            </div>
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Zona</div>
+                <div style="font-weight:bold;">${raw.zona || '—'}</div>
+            </div>
+        </div>
+
+        <div style="background:#f0faf0;padding:12px;border-radius:8px;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:bold;color:#27ae60;margin-bottom:8px;">CÓMO SE CALCULÓ</div>
+            ${(() => {
+                const tienePromo = raw.precio_lista > 0 && raw.descuento > 0;
+                const esGratis = tienePromo && raw.descuento >= raw.precio_lista && raw.total === 0;
+                const esDescuento = tienePromo && !esGratis;
+
+                if (esGratis) {
+                    return `<table style="width:100%;font-size:13px;">
+                        <tr><td>Precio original</td><td style="text-align:right;">S/ ${Math.round(raw.precio_lista)}</td></tr>
+                        <tr style="color:#27ae60;"><td>Descuento</td><td style="text-align:right;">- S/ ${Math.round(raw.descuento)} (100%)</td></tr>
+                        <tr style="font-weight:bold;border-top:1px solid #ccc;">
+                            <td>TOTAL COBRADO</td>
+                            <td style="text-align:right;color:#27ae60;">S/ 0 — GRATIS</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top:6px;font-size:11px;color:#888;">
+                        Este ítem se registró como <strong>gratis</strong>. El precio original (S/ ${Math.round(raw.precio_lista)}) se guardó como referencia.
+                        No entra en facturado ni en por cobrar.
+                    </div>`;
+                } else if (esDescuento) {
+                    const pct = Math.round((raw.descuento / raw.precio_lista) * 100);
+                    return `<table style="width:100%;font-size:13px;">
+                        <tr><td>Precio original</td><td style="text-align:right;">S/ ${Math.round(raw.precio_lista)}</td></tr>
+                        <tr style="color:#e67e22;"><td>Descuento</td><td style="text-align:right;">- S/ ${Math.round(raw.descuento)} (${pct}%)</td></tr>
+                        <tr style="font-weight:bold;border-top:1px solid #ccc;">
+                            <td>TOTAL COBRADO</td>
+                            <td style="text-align:right;">S/ ${Math.round(raw.total)}</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top:6px;font-size:11px;color:#888;">
+                        Se aplicó un descuento de S/ ${Math.round(raw.descuento)} sobre el precio original de S/ ${Math.round(raw.precio_lista)}.
+                    </div>`;
+                } else {
+                    return `<table style="width:100%;font-size:13px;">
+                        <tr style="font-weight:bold;">
+                            <td>Precio de venta</td>
+                            <td style="text-align:right;">S/ ${Math.round(raw.total)}</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top:6px;font-size:11px;color:#888;">
+                        Venta directa sin descuento ni promoción.
+                    </div>`;
+                }
+            })()}
+        </div>
+
+        <div style="background:#f0f4fa;padding:12px;border-radius:8px;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:bold;color:#2980b9;margin-bottom:8px;">PAGOS RECIBIDOS (${pagosRelacionados.length})</div>
+            ${pagosRelacionados.length > 0 ? pagosRelacionados.map(p => {
+                let metodo = p.efectivo > 0 ? 'Efectivo' : p.yape > 0 ? 'Yape' : p.plin > 0 ? 'Plin' : p.giro > 0 ? 'Giro' : '—';
+                return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid #e8e8e8;">
+                    <span>${p.fecha ? p.fecha.split('-').reverse().join('/') : ''} · ${p.cod_pago} · ${metodo}</span>
+                    <span style="font-weight:bold;">S/ ${Math.round(p.monto)}</span>
+                </div>`;
+            }).join('') : '<div style="font-size:13px;color:#aaa;">Sin pagos registrados</div>'}
+            <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-weight:bold;font-size:13px;border-top:1px solid #aaa;margin-top:4px;">
+                <span>Total pagado</span><span>S/ ${Math.round(totalPagado)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:${debeReal > 0.5 ? '#C0392B' : '#27ae60'};font-weight:bold;">
+                <span>${debeReal > 0.5 ? 'SALDO PENDIENTE' : 'PAGADO COMPLETAMENTE'}</span>
+                <span>${debeReal > 0.5 ? 'S/ ' + Math.round(debeReal) : '✅'}</span>
+            </div>
+        </div>
+
+        <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:12px;color:#888;font-weight:bold;">DATOS CRUDOS DE LA SHEET</summary>
+            <div style="background:#f8f8f8;padding:10px;border-radius:6px;margin-top:6px;font-family:monospace;font-size:11px;line-height:1.8;word-break:break-all;">
+                ${Object.entries(raw).map(([k,v]) => `<strong>${k}</strong>=${v}`).join(' · ')}
+            </div>
+        </details>`;
+
+    } else if (m._tipo === 'pago') {
+        // Buscar la venta asociada a este COD_ITEM
+        const ventaAsociada = libroData.ventas.find(v => v.cod_item === raw.cod_item);
+        let metodo = raw.efectivo > 0 ? `Efectivo S/ ${Math.round(raw.efectivo)}` :
+                     raw.yape > 0 ? `Yape S/ ${Math.round(raw.yape)}` :
+                     raw.plin > 0 ? `Plin S/ ${Math.round(raw.plin)}` :
+                     raw.giro > 0 ? `Giro S/ ${Math.round(raw.giro)}` : '—';
+
+        html = `
+        <div style="font-size:11px;text-transform:uppercase;color:#2980b9;font-weight:bold;letter-spacing:1px;margin-bottom:8px;">Detalle de Pago</div>
+        <div style="font-size:18px;font-weight:bold;margin-bottom:4px;">S/ ${Math.round(raw.monto)} — ${metodo}</div>
+        <div style="font-size:13px;color:#888;margin-bottom:16px;">${raw.cod_pago} · ${raw.fecha ? raw.fecha.split('-').reverse().join('/') : ''}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Cliente</div>
+                <div style="font-weight:bold;">${raw.cliente}</div>
+                <div style="font-size:11px;color:#aaa;">${raw.cod_cliente}</div>
+            </div>
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Categoría</div>
+                <div style="font-weight:bold;">${raw.categoria || '—'}</div>
+            </div>
+        </div>
+
+        ${raw.cod_item ? `
+        <div style="background:#f0faf0;padding:12px;border-radius:8px;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:bold;color:#27ae60;margin-bottom:8px;">TRAZABILIDAD — ¿A QUÉ VENTA VA ESTE PAGO?</div>
+            ${ventaAsociada ? `
+                <div style="font-size:13px;">
+                    <div>Venta: <strong>${ventaAsociada.cod_item}</strong> — ${ventaAsociada.categoria} (${ventaAsociada.tipo})</div>
+                    <div>Fecha de venta: ${ventaAsociada.fecha ? ventaAsociada.fecha.split('-').reverse().join('/') : ''}</div>
+                    <div>Total venta: S/ ${Math.round(ventaAsociada.total)}</div>
+                    <div>Cliente de la venta: ${ventaAsociada.cliente}</div>
+                </div>
+            ` : `<div style="font-size:13px;color:#aaa;">COD_ITEM: ${raw.cod_item} (venta no encontrada en datos cargados)</div>`}
+        </div>` : `
+        <div style="background:#fff8e0;padding:12px;border-radius:8px;margin-bottom:16px;">
+            <div style="font-size:12px;color:#e67e22;">Este pago no está vinculado a un ítem específico (sin COD_ITEM).</div>
+            ${raw.notas ? `<div style="font-size:13px;margin-top:4px;">Notas: ${raw.notas}</div>` : ''}
+        </div>`}
+
+        <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:12px;color:#888;font-weight:bold;">DATOS CRUDOS DE LA SHEET</summary>
+            <div style="background:#f8f8f8;padding:10px;border-radius:6px;margin-top:6px;font-family:monospace;font-size:11px;line-height:1.8;word-break:break-all;">
+                ${Object.entries(raw).map(([k,v]) => `<strong>${k}</strong>=${v}`).join(' · ')}
+            </div>
+        </details>`;
+
+    } else if (m._tipo === 'gasto') {
+        html = `
+        <div style="font-size:11px;text-transform:uppercase;color:#C0392B;font-weight:bold;letter-spacing:1px;margin-bottom:8px;">Detalle de Gasto</div>
+        <div style="font-size:18px;font-weight:bold;margin-bottom:4px;">S/ ${Math.round(raw.monto)} — ${raw.tipo}</div>
+        <div style="font-size:13px;color:#888;margin-bottom:16px;">${raw.fecha ? raw.fecha.split('-').reverse().join('/') : ''}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Descripción</div>
+                <div style="font-weight:bold;">${raw.descripcion || '—'}</div>
+            </div>
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Destinatario</div>
+                <div style="font-weight:bold;">${raw.destinatario || '—'}</div>
+            </div>
+            <div style="background:#f8f8f8;padding:10px;border-radius:8px;">
+                <div style="font-size:11px;color:#888;">Método de pago</div>
+                <div style="font-weight:bold;">${raw.metodo_pago || '—'}</div>
+            </div>
+        </div>
+
+        <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:12px;color:#888;font-weight:bold;">DATOS CRUDOS DE LA SHEET</summary>
+            <div style="background:#f8f8f8;padding:10px;border-radius:6px;margin-top:6px;font-family:monospace;font-size:11px;line-height:1.8;word-break:break-all;">
+                ${Object.entries(raw).map(([k,v]) => `<strong>${k}</strong>=${v}`).join(' · ')}
+            </div>
+        </details>`;
+    }
+
+    document.getElementById('libro-detalle-contenido').innerHTML = html;
+    document.getElementById('libro-detalle-overlay').style.display = 'block';
+}
+
+function cerrarDetalleLibro() {
+    document.getElementById('libro-detalle-overlay').style.display = 'none';
+}
+
+function limpiarFiltrosLibro() {
+    document.getElementById('libro-desde').value = '';
+    document.getElementById('libro-hasta').value = '';
+    document.getElementById('libro-tipo').value = '';
+    document.getElementById('libro-cliente').value = '';
+    document.getElementById('libro-categoria').value = '';
+    document.getElementById('libro-metodo').value = '';
+    filtrarLibro();
+}
+
+let _resaltadoActivo = null;  // COD_ITEM actualmente resaltado
+
+function toggleResaltado(codItem) {
+    if (!codItem) return;
+    const table = document.getElementById('libro-table');
+    if (!table) return;
+    const rows = table.querySelectorAll('tbody tr');
+
+    if (_resaltadoActivo === codItem) {
+        // Ya está resaltado → quitar
+        rows.forEach(tr => { tr.style.background = ''; tr.style.boxShadow = ''; });
+        _resaltadoActivo = null;
+    } else {
+        // Resaltar las filas con este código
+        rows.forEach(tr => {
+            if (tr.dataset.codEnlace === codItem) {
+                tr.style.background = '#fffde0';
+                tr.style.boxShadow = 'inset 3px 0 0 #f1c40f';
+            } else {
+                tr.style.background = '';
+                tr.style.boxShadow = '';
+            }
+        });
+        _resaltadoActivo = codItem;
+    }
+}
+
+function exportarLibroCSV() {
+    if (!libroFiltrado || libroFiltrado.length === 0) return alert('No hay datos para exportar.');
+    const headers = ['Fecha','Tipo','Cliente','Categoría','Monto','Método','Código','Vinculado a'];
+    let csv = headers.join(',') + '\n';
+    libroFiltrado.forEach(m => {
+        const row = [
+            m.fecha,
+            m._tipo === 'venta' ? 'Venta' : m._tipo === 'pago' ? 'Pago' : 'Gasto',
+            '"' + (m.cliente || '').replace(/"/g, '""') + '"',
+            '"' + (m.categoria || '').replace(/"/g, '""') + '"',
+            Math.round(m.monto),
+            m.metodo || '',
+            m.codigo || '',
+            m.vinculado_a || ''
+        ];
+        csv += row.join(',') + '\n';
+    });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `libro_movimientos_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 </script>
 </body>
 </html>
