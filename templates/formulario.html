@@ -1787,12 +1787,13 @@ function getItemsData() {
         const precioOrig  = parseFloat(document.getElementById(`precio_orig_${i}`)?.value || 0);
         const tc          = parseFloat(document.getElementById(`tc_item_${i}`)?.value || 0);
         const precioSoles = parseFloat(document.getElementById(`total_item_${i}`)?.value || 0);
+        const esGratis   = document.getElementById(`es_gratis_flag_${i}`)?.value === '1';
         const sym        = moneda === 'USD' ? 'US$' : (moneda === 'EUR' ? '€' : 'S/');
         const label      = cat || tipo;
         const precioDisplay = moneda === 'Soles'
             ? `S/ ${precioOrig}`
             : `${sym} ${precioOrig} @ ${tc} = S/ ${precioSoles}`;
-        items.push({ idx: i, tipo, label, moneda, precioOrig, tc, precioSoles, precioDisplay });
+        items.push({ idx: i, tipo, label, moneda, precioOrig, tc, precioSoles, precioDisplay, esGratis });
     }
     return items;
 }
@@ -1893,8 +1894,25 @@ function actualizarResumen() {
         distHtml += `</div>`;
     }
 
-    // 2) Ítems nuevos
+    // 2) Ítems nuevos (los gratis se muestran como etiqueta fija, sin input editable)
     items.forEach(it => {
+        if (it.esGratis) {
+            distHtml += `
+            <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:bold;color:#27ae60;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.label}</div>
+                        <div style="font-size:11px;color:#27ae60;">Precio lista: ${it.precioDisplay}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <span style="font-size:13px;font-weight:bold;color:#27ae60;">GRATIS</span>
+                        <input type="hidden" name="pago_item_${it.idx}" id="pago_item_${it.idx}" value="0">
+                    </div>
+                </div>
+            </div>`;
+            pagosPorItem[it.idx] = 0;
+            return;
+        }
         const esUltimo = it.idx === lastIdx;
         const valActual = pagosPorItem[it.idx] !== undefined ? pagosPorItem[it.idx] : '';
         if (esUltimo && items.length >= 1) {
@@ -1997,11 +2015,13 @@ function autoRellenarPorPago() {
     });
 
     // 2) Rellenar ítems en orden: cada uno hasta su precio, el último con el restante exacto
+    //    Los ítems gratis se SALTAN (ya tienen pago_item = 0 fijo)
     const items = getItemsData();
-    items.forEach((it, pos) => {
+    const itemsCobrables = items.filter(it => !it.esGratis);
+    itemsCobrables.forEach((it, pos) => {
         const inputEl = document.getElementById(`pago_item_${it.idx}`);
         if (!inputEl) return;
-        const esUltimo = pos === items.length - 1;
+        const esUltimo = pos === itemsCobrables.length - 1;
         const val = esUltimo
             ? Math.round(Math.min(it.precioSoles, Math.max(0, disponible)))
             : Math.round(Math.min(it.precioSoles, Math.max(0, disponible)));
